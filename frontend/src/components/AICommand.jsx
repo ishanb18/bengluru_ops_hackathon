@@ -252,38 +252,44 @@ export default function AICommand({
                     SHAP Feature Explanation
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                    {classResult.shap_explanation && classResult.shap_explanation.length > 0 ? (
-                      classResult.shap_explanation.map((shap, index) => {
+                    {classResult.shap_explanation && classResult.shap_explanation.length > 0 ? (() => {
+                      // Normalize bar widths relative to max SHAP magnitude in this result
+                      const maxAbsVal = Math.max(...classResult.shap_explanation.map(s => Math.abs(s.value)), 0.001);
+
+                      // Convert OHE feature names to human-readable labels
+                      const formatShapLabel = (raw) => {
+                        if (!raw || raw === "shap_unavailable") return "Unavailable";
+                        const prefixMap = {
+                          "corridor_": "📍 ",
+                          "event_cause_": "⚡ ",
+                          "veh_type_": "🚗 ",
+                          "weekday_name_": "📅 ",
+                          "event_type_": "📋 ",
+                        };
+                        for (const [prefix, icon] of Object.entries(prefixMap)) {
+                          if (raw.startsWith(prefix)) {
+                            const suffix = raw.slice(prefix.length).replace(/_/g, " ");
+                            // Special labels
+                            if (suffix === "Non corridor" || suffix === "Non-corridor") return icon + "No Named Corridor";
+                            return icon + suffix;
+                          }
+                        }
+                        const numericMap = {
+                          "is_peak_hour": "🕐 Peak Hour",
+                          "hour": "🕐 Hour of Day",
+                          "weekday": "📅 Day of Week",
+                          "month": "📆 Month",
+                          "has_cargo_data": "🚛 Cargo Vehicle",
+                          "has_junction": "🔀 Junction Involved",
+                        };
+                        return numericMap[raw] || raw.replace(/_/g, " ");
+                      };
+
+                      return classResult.shap_explanation.map((shap, index) => {
                         const isPositive = shap.value >= 0;
                         const absVal = Math.abs(shap.value);
-                        const barWidth = Math.min(100, Math.round(absVal * 120)); // scaled
-
-                        // Convert OHE feature names to human-readable labels
-                        const formatShapLabel = (raw) => {
-                          if (!raw || raw === "shap_unavailable") return "Unavailable";
-                          const prefixMap = {
-                            "corridor_": "📍 ",
-                            "event_cause_": "⚡ ",
-                            "veh_type_": "🚗 ",
-                            "weekday_name_": "📅 ",
-                            "event_type_": "📋 ",
-                          };
-                          for (const [prefix, icon] of Object.entries(prefixMap)) {
-                            if (raw.startsWith(prefix)) {
-                              return icon + raw.slice(prefix.length).replace(/_/g, " ");
-                            }
-                          }
-                          // Plain numeric features
-                          const numericMap = {
-                            "is_peak_hour": "🕐 Peak Hour",
-                            "hour": "🕐 Hour of Day",
-                            "weekday": "📅 Day of Week",
-                            "month": "📆 Month",
-                            "has_cargo_data": "📦 Has Cargo",
-                            "has_junction": "🔀 Junction Involved",
-                          };
-                          return numericMap[raw] || raw.replace(/_/g, " ");
-                        };
+                        // Proportional bar — max 90px wide
+                        const barWidth = Math.round((absVal / maxAbsVal) * 90);
 
                         return (
                           <div className="shap-row" key={index} style={{ padding: "4px 0" }}>
@@ -291,19 +297,19 @@ export default function AICommand({
                             <div style={{ flex: 1, display: "flex", justifyContent: isPositive ? "flex-start" : "flex-end", margin: "0 8px" }}>
                               <div
                                 className={isPositive ? "shap-bar-pos" : "shap-bar-neg"}
-                                style={{ width: `${barWidth}px` }}
+                                style={{ width: `${barWidth}px`, minWidth: "4px" }}
                               ></div>
                             </div>
                             <span className="shap-val" style={{ fontSize: "11px", color: isPositive ? "var(--red)" : "var(--green)" }}>
-                              {isPositive ? "+" : ""}{shap.value.toFixed(2)}
+                              {isPositive ? "+" : ""}{shap.value.toFixed(3)}
                             </span>
                           </div>
                         );
-                      })
-                    ) : (
+                      });
+                    })() : (
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "11px" }}>
-                        <span className="shap-label">Shap Unavailable</span>
-                        <span className="shap-val" style={{ color: "var(--red)" }}>+0.00</span>
+                        <span className="shap-label">SHAP Unavailable</span>
+                        <span className="shap-val" style={{ color: "var(--red)" }}>+0.000</span>
                       </div>
                     )}
                   </div>

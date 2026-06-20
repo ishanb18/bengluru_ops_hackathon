@@ -1,16 +1,52 @@
 import React, { useState, useEffect } from "react";
 
+// Top corridors to dynamically pre-fetch summary diversions for the summary panel
+const TOP_CORRIDORS_FOR_PANEL = [
+  "Mysore Road", "Bellary Road 1", "ORR East 1", "Hosur Road", "Old Madras Road"
+];
+
+const EVENT_CAUSES = [
+  { value: "vehicle_breakdown", label: "Vehicle Breakdown" },
+  { value: "accident", label: "Accident" },
+  { value: "construction", label: "Construction" },
+  { value: "water_logging", label: "Water Logging (Flooding)" },
+  { value: "vip_movement", label: "VIP Movement" },
+  { value: "public_event", label: "Public Event" },
+  { value: "tree_fall", label: "Tree Fall" },
+  { value: "pot_holes", label: "Pot Holes" },
+  { value: "others", label: "Other / Debris" },
+];
+
+const VEH_TYPES = [
+  { value: "heavy_vehicle", label: "Heavy Vehicle (HGV)" },
+  { value: "lcv", label: "LCV" },
+  { value: "private_car", label: "Car" },
+  { value: "two_wheeler", label: "Two-Wheeler" },
+  { value: "N/A", label: "N/A" },
+];
+
 export default function Diversion({ availableCorridors }) {
-  const [selectedCorridor, setSelectedCorridor] = useState("Bellary Road 1");
+  const [selectedCorridor, setSelectedCorridor] = useState("");
   const [eventCause, setEventCause] = useState("vehicle_breakdown");
   const [vehType, setVehType] = useState("N/A");
   const [hour, setHour] = useState(9);
   const [diversions, setDiversions] = useState([]);
   const [routesStress, setRoutesStress] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [corridorSummary, setCorridorSummary] = useState({});
+  const [summaryLoading, setSummaryLoading] = useState(false);
 
-  // Fetch alternate routes for the selected corridor incorporating query parameters
+  // Auto-select first non-null corridor once corridors load
   useEffect(() => {
+    if (!selectedCorridor && availableCorridors && availableCorridors.length > 0) {
+      const first = availableCorridors.filter(c => c !== "Non-corridor")[0];
+      if (first) setSelectedCorridor(first);
+    }
+  }, [availableCorridors]);
+
+  // Fetch alternate routes for the selected corridor
+  useEffect(() => {
+    if (!selectedCorridor) return;
     async function fetchDiversions() {
       setLoading(true);
       try {
@@ -19,7 +55,9 @@ export default function Diversion({ availableCorridors }) {
           veh_type: vehType,
           hour: hour.toString()
         });
-        const res = await fetch(`http://localhost:8000/api/diversion/${encodeURIComponent(selectedCorridor)}?${queryParams.toString()}`);
+        const res = await fetch(
+          `http://localhost:8000/api/diversion/${encodeURIComponent(selectedCorridor)}?${queryParams.toString()}`
+        );
         if (res.ok) {
           const data = await res.json();
           setDiversions(data.alternates || []);
@@ -33,11 +71,10 @@ export default function Diversion({ availableCorridors }) {
         setLoading(false);
       }
     }
-
     fetchDiversions();
   }, [selectedCorridor, eventCause, vehType, hour]);
 
-  // Fetch all routes stress scores for the stress display from the correct endpoint
+  // Fetch corridor risk stress scores for the bar chart panel
   useEffect(() => {
     async function fetchStress() {
       try {
@@ -53,8 +90,37 @@ export default function Diversion({ availableCorridors }) {
     fetchStress();
   }, []);
 
+  // Dynamically fetch live first-alternate for summary panel corridors
+  useEffect(() => {
+    async function fetchSummary() {
+      setSummaryLoading(true);
+      const results = {};
+      await Promise.all(
+        TOP_CORRIDORS_FOR_PANEL.map(async (corridor) => {
+          try {
+            const res = await fetch(
+              `http://localhost:8000/api/diversion/${encodeURIComponent(corridor)}`
+            );
+            if (res.ok) {
+              const data = await res.json();
+              const firstAlt = data.alternates?.[0];
+              results[corridor] = firstAlt ? firstAlt.name : "No alternate found";
+            } else {
+              results[corridor] = "Unavailable";
+            }
+          } catch {
+            results[corridor] = "API Error";
+          }
+        })
+      );
+      setCorridorSummary(results);
+      setSummaryLoading(false);
+    }
+    fetchSummary();
+  }, []);
+
   const getStressPillClass = (stressStr) => {
-    const s = stressStr.toLowerCase();
+    const s = (stressStr || "").toLowerCase();
     if (s.includes("low")) return "stress-low";
     if (s.includes("medium") || s.includes("mod")) return "stress-med";
     return "stress-high";
@@ -88,7 +154,7 @@ export default function Diversion({ availableCorridors }) {
                       <option key={c} value={c}>{c}</option>
                     ))
                   ) : (
-                    <option value="Loading...">Loading...</option>
+                    <option value="">Loading corridors...</option>
                   )}
                 </select>
               </div>
@@ -100,13 +166,9 @@ export default function Diversion({ availableCorridors }) {
                   value={eventCause}
                   onChange={(e) => setEventCause(e.target.value)}
                 >
-                  <option value="vehicle_breakdown">Vehicle breakdown</option>
-                  <option value="accident">Accident</option>
-                  <option value="construction">Construction</option>
-                  <option value="water_logging">Water logging (flooding)</option>
-                  <option value="vip_movement">VIP movement</option>
-                  <option value="public_event">Public event</option>
-                  <option value="tree_fall">Tree fall</option>
+                  {EVENT_CAUSES.map(({ value, label }) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -119,11 +181,9 @@ export default function Diversion({ availableCorridors }) {
                   value={vehType}
                   onChange={(e) => setVehType(e.target.value)}
                 >
-                  <option value="heavy_vehicle">Heavy vehicle (HGV)</option>
-                  <option value="lcv">LCV</option>
-                  <option value="private_car">Car</option>
-                  <option value="two_wheeler">Two-wheeler</option>
-                  <option value="N/A">N/A</option>
+                  {VEH_TYPES.map(({ value, label }) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
                 </select>
               </div>
 
@@ -134,6 +194,7 @@ export default function Diversion({ availableCorridors }) {
                   value={hour}
                   onChange={(e) => setHour(parseInt(e.target.value))}
                 >
+                  <option value={6}>Early Morning (05:00 – 07:00)</option>
                   <option value={9}>Morning Rush (08:00 – 10:00)</option>
                   <option value={13}>Midday (12:00 – 14:00)</option>
                   <option value={18}>Evening Rush (17:00 – 20:00)</option>
@@ -144,7 +205,9 @@ export default function Diversion({ availableCorridors }) {
             
             <div className="divider" style={{ margin: "16px 0" }}></div>
 
-            <div className="card-title" style={{ marginBottom: "12px" }}>Alternative Options for: {selectedCorridor}</div>
+            <div className="card-title" style={{ marginBottom: "12px" }}>
+              Alternative Options for: {selectedCorridor || "—"}
+            </div>
 
             {loading ? (
               <div style={{ color: "var(--text-secondary)", textAlign: "center", padding: "20px", fontSize: "13px" }}>
@@ -188,28 +251,32 @@ export default function Diversion({ availableCorridors }) {
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
           
           <div className="card">
-            <div className="card-title">All Corridor Diversions</div>
+            <div className="card-title">Live Corridor Diversion Summary</div>
             <div style={{ display: "flex", flexDirection: "column", gap: "10px", fontSize: "12px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid var(--border)", paddingBottom: "6px" }}>
-                <span style={{ fontWeight: "600", color: "var(--text-primary)" }}>Mysore Road blocked</span>
-                <span className="mono" style={{ color: "var(--text-secondary)" }}>→ Magadi Rd · NICE</span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid var(--border)", paddingBottom: "6px" }}>
-                <span style={{ fontWeight: "600", color: "var(--text-primary)" }}>Bellary Road 1 blocked</span>
-                <span className="mono" style={{ color: "var(--text-secondary)" }}>→ Bellary Rd 2 · Hebbal</span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid var(--border)", paddingBottom: "6px" }}>
-                <span style={{ fontWeight: "600", color: "var(--text-primary)" }}>ORR East 1 blocked</span>
-                <span className="mono" style={{ color: "var(--text-secondary)" }}>→ ORR East 2</span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid var(--border)", paddingBottom: "6px" }}>
-                <span style={{ fontWeight: "600", color: "var(--text-primary)" }}>Hosur Road blocked</span>
-                <span className="mono" style={{ color: "var(--text-secondary)" }}>→ Bannerghatta Road</span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", paddingBottom: "6px" }}>
-                <span style={{ fontWeight: "600", color: "var(--text-primary)" }}>Old Madras Rd blocked</span>
-                <span className="mono" style={{ color: "var(--text-secondary)" }}>→ KR Pura alternate</span>
-              </div>
+              {summaryLoading ? (
+                <div style={{ color: "var(--text-secondary)", fontSize: "12px", padding: "8px 0" }}>
+                  Loading live diversion data...
+                </div>
+              ) : (
+                TOP_CORRIDORS_FOR_PANEL.map((corridor, i) => (
+                  <div
+                    key={corridor}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      borderBottom: i < TOP_CORRIDORS_FOR_PANEL.length - 1 ? "1px solid var(--border)" : "none",
+                      paddingBottom: "6px"
+                    }}
+                  >
+                    <span style={{ fontWeight: "600", color: "var(--text-primary)" }}>
+                      {corridor} blocked
+                    </span>
+                    <span className="mono" style={{ color: "var(--text-secondary)", maxWidth: "120px", textAlign: "right" }}>
+                      → {corridorSummary[corridor] || "Fetching..."}
+                    </span>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 

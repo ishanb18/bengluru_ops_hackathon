@@ -55,6 +55,35 @@ STATIC_DIVERSIONS = {
     ],
 }
 
+
+def _extract_route_name(route: dict, idx: int) -> str:
+    """
+    Parse TomTom guidance instructions to build a human-readable route name
+    from the actual road segments used, e.g. 'Via Outer Ring Road → Bannerghatta Road'.
+    Falls back to 'Alternate Route N' if instructions are unavailable.
+    """
+    try:
+        guidance = route.get("guidance", {})
+        instructions = guidance.get("instructions", [])
+        # Collect road names from significant maneuvers (ROAD_CHANGE, TURN, ROUNDABOUT)
+        roads_seen: list[str] = []
+        for inst in instructions:
+            road = (inst.get("street") or "").strip()
+            road_nums = inst.get("roadNumbers", [])
+            label = " / ".join(road_nums) if road_nums else road
+            # Skip unnamed segments, very short names (like "A") and duplicates
+            if label and len(label) > 3 and label not in roads_seen:
+                roads_seen.append(label)
+
+        # Take the first 3 distinct major roads (skip service lanes etc.)
+        major = [r for r in roads_seen if not r.startswith(("Slip", "Service", "Ramp"))][:3]
+        if major:
+            return "Via " + " → ".join(major)
+    except Exception:
+        pass
+    return f"Alternate Route {idx + 1}"
+
+
 @router.get("/{corridor_name}")
 async def get_diversions(corridor_name: str):
     coords = CORRIDOR_COORDS.get(corridor_name)
@@ -77,7 +106,9 @@ async def get_diversions(corridor_name: str):
         "computeBestOrder": "false",
         "routeType": "fastest",
         "traffic": "true",
-        "maxAlternatives": 2
+        "maxAlternatives": 2,
+        "instructionsType": "text",         # enables guidance.instructions with street names
+        "instructionAnnouncementPoints": "all",
     }
 
     try:
@@ -108,7 +139,10 @@ async def get_diversions(corridor_name: str):
         travel_time = summary.get("travelTimeInSeconds", 0)
         traffic_delay = summary.get("trafficDelayInSeconds", 0)
         length_km = summary.get("lengthInMeters", 0) / 1000.0
-        
+
+        # Extract real road names from guidance instructions
+        route_name = _extract_route_name(r, idx)
+
         # Calculate extra minutes compared to a traffic-free primary route, or just absolute delay
         extra_minutes = round(traffic_delay / 60.0)
         stress_score = min(100, round(extra_minutes * 3.5, 1))
@@ -121,11 +155,11 @@ async def get_diversions(corridor_name: str):
             stress_level = "High"
 
         alternatives.append({
-            "name": f"TomTom Alternate Route {idx+1}",
+            "name": route_name,
             "stress_score": stress_score,
             "stress_level": stress_level,
             "extra_minutes": extra_minutes,
-            "notes": f"{round(length_km, 1)}km live routed path. {extra_minutes} min traffic delay."
+            "notes": f"{round(length_km, 1)} km live-routed path. {extra_minutes} min traffic delay."
         })
 
     return {

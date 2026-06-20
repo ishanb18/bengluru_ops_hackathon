@@ -177,13 +177,12 @@ def _seed_database():
     ]
     df_db = df[[c for c in keep_cols if c in df.columns]].copy()
 
-    # ── Write to SQLite using sqlite3 directly (pandas compatibility) ─────────
-    import sqlite3
-    sqlite_conn = sqlite3.connect(str(DB_PATH))
-    df_db.to_sql("events", sqlite_conn, if_exists="append", index=False, chunksize=500)
-    sqlite_conn.commit()
-    sqlite_conn.close()
+    # ── Write to SQLite using the WAL-enabled SQLAlchemy engine ──────────────
+    from app.models.db import engine as sa_engine
+    with sa_engine.begin() as conn:
+        df_db.to_sql("events", conn, if_exists="append", index=False, chunksize=500)
     logger.info(f"[OK] Database seeded with {len(df_db)} events")
+
 
 
 # ── Health Check ───────────────────────────────────────────────────────────────

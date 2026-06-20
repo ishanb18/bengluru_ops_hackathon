@@ -4,13 +4,13 @@ import AICommand from "./components/AICommand";
 import Diversion from "./components/Diversion";
 import Analytics from "./components/Analytics";
 
-const BACKEND_URL = "http://localhost:8000";
+const BACKEND_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState(0); // 0: Live Monitor, 1: AI Predictor, 2: Diversions, 3: Analytics
   const [events, setEvents] = useState([]);
   const [stats, setStats] = useState({
-    total_incidents: 8173,
+    total_incidents: 0,
     active_incidents: 0,
     high_priority_active: 0,
     road_closures_active: 0
@@ -168,10 +168,11 @@ export default function App() {
         const validCauses = ["vehicle_breakdown", "accident", "construction", "water_logging", "vip_movement", "public_event", "pot_holes", "tree_fall", "others"];
         if (!validCauses.includes(causeVal)) causeVal = "vehicle_breakdown";
 
-        // Match Corridor options
+        // Match Corridor options — use live corridors from API, fall back to a safe default
         let corridorVal = incident.corridor || "Non-corridor";
-        const validCorridors = ["Tumkur Road", "Mysore Road", "Bellary Road 1", "Hosur Road", "ORR East 1", "Old Madras Road", "Non-corridor"];
-        if (!validCorridors.includes(corridorVal)) corridorVal = "Non-corridor";
+        if (availableCorridors.length > 0 && !availableCorridors.includes(corridorVal)) {
+          corridorVal = "Non-corridor";
+        }
 
         // Match Vehicle Type options
         let vehVal = incident.veh_type || "N/A";
