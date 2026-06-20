@@ -17,8 +17,44 @@ PROCESSED_DIR = BASE_DIR / "data" / "processed"
 
 CATEGORICAL_FEATURES = ["event_cause", "corridor", "veh_type", "weekday_name", "event_type"]
 NUMERIC_FEATURES = ["hour", "month", "is_peak_hour", "weekday",
-                    "has_cargo_data", "priority_high"]
+                    "has_cargo_data", "has_junction"]
 ALL_FEATURES = CATEGORICAL_FEATURES + NUMERIC_FEATURES
+
+
+def _unwrap(obj):
+    """
+    Safely extract a ready-to-use sklearn Pipeline/estimator from joblib output.
+
+    Priority order:
+      1. If already a Pipeline/estimator (not a dict) → return as-is
+      2. If dict → look for a value with named_steps (full sklearn Pipeline)
+      3. If dict → reconstruct Pipeline from preprocessor + classifier parts
+      4. If dict → return any value that has predict_proba / predict
+    """
+    if not isinstance(obj, dict):
+        return obj
+
+    # Priority 1: find a full sklearn Pipeline (has named_steps attribute)
+    for v in obj.values():
+        if hasattr(v, "named_steps"):
+            return v
+
+    # Priority 2: reconstruct Pipeline from separate preprocessor + classifier
+    preprocessor = obj.get("preprocessor")
+    for key in ("pipeline", "model", "classifier", "clf", "estimator"):
+        if key in obj and hasattr(obj[key], "predict_proba"):
+            clf = obj[key]
+            if preprocessor is not None and hasattr(preprocessor, "transform"):
+                from sklearn.pipeline import Pipeline as SKPipeline
+                return SKPipeline([("preprocessor", preprocessor), ("classifier", clf)])
+            return clf
+
+    # Priority 3: any estimator in the dict values
+    for v in obj.values():
+        if hasattr(v, "predict_proba") or hasattr(v, "predict"):
+            return v
+
+    raise ValueError(f"Cannot extract estimator from dict keys: {list(obj.keys())}")
 
 
 # ── Model Loading (cached — only loaded once at startup) ──────────────────────
@@ -28,7 +64,8 @@ def load_priority_model():
     path = MODELS_DIR / "priority_model.pkl"
     if not path.exists():
         raise RuntimeError(f"priority_model.pkl not found at {path}. Run train_classifier.py first!")
-    return joblib.load(path)
+    return _unwrap(joblib.load(path))
+
 
 
 @lru_cache(maxsize=None)
@@ -36,7 +73,7 @@ def load_closure_model():
     path = MODELS_DIR / "closure_model.pkl"
     if not path.exists():
         raise RuntimeError(f"closure_model.pkl not found at {path}. Run train_classifier.py first!")
-    return joblib.load(path)
+    return _unwrap(joblib.load(path))
 
 
 @lru_cache(maxsize=None)
@@ -44,7 +81,7 @@ def load_duration_bucket_model():
     path = MODELS_DIR / "duration_bucket_model.pkl"
     if not path.exists():
         raise RuntimeError(f"duration_bucket_model.pkl not found at {path}. Run train_duration.py first!")
-    return joblib.load(path)
+    return _unwrap(joblib.load(path))
 
 
 @lru_cache(maxsize=None)
@@ -52,7 +89,7 @@ def load_duration_regression_model():
     path = MODELS_DIR / "duration_regression_model.pkl"
     if not path.exists():
         raise RuntimeError(f"duration_regression_model.pkl not found at {path}. Run train_duration.py first!")
-    return joblib.load(path)
+    return _unwrap(joblib.load(path))
 
 
 @lru_cache(maxsize=None)
@@ -203,21 +240,26 @@ def get_shap_explanation(data: dict, model_type: str = "priority") -> list:
         explainer = shap.TreeExplainer(clf)
         shap_values = explainer.shap_values(X_enc)
 
+        # Handle old API (list) and new SHAP ≥0.41 (3D ndarray: n_samples, n_features, n_classes)
         if isinstance(shap_values, list):
-            sv = shap_values[1][0]
+            sv = shap_values[1][0]        # old: class1 array, first sample
+        elif shap_values.ndim == 3:
+            sv = shap_values[0, :, 1]     # new: first sample, all features, class1
         else:
-            sv = shap_values[0]
+            sv = shap_values[0]           # already (n_samples, n_features)
 
         top_idx = np.argsort(np.abs(sv))[::-1][:4]
         return [
             {
-                "feature": feature_names[i] if i < len(feature_names) else f"feature_{i}",
-                "value": round(float(sv[i]), 3),
-                "direction": "+" if sv[i] > 0 else "-",
+                "feature": feature_names[int(i)] if int(i) < len(feature_names) else f"feature_{i}",
+                "value": round(float(sv[int(i)]), 3),
+                "direction": "+" if sv[int(i)] > 0 else "-",
             }
             for i in top_idx
         ]
     except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"SHAP failed: {e}")
         return [{"feature": "shap_unavailable", "value": 0.0, "direction": "+",
                  "error": str(e)}]
 

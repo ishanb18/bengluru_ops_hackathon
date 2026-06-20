@@ -217,20 +217,22 @@ def compute_shap_values(pipeline, X_sample: pd.DataFrame, feature_names: list) -
         explainer = shap.TreeExplainer(clf)
         shap_values = explainer.shap_values(X_enc)
 
-        # For binary classification shap_values is a list [class0, class1]
+        # Handle old API (list) and new SHAP ≥0.41 (3D ndarray: n_samples, n_features, n_classes)
         if isinstance(shap_values, list):
-            sv = shap_values[1]  # class=High/True
+            sv = shap_values[1]           # old: [class0_arr, class1_arr]
+        elif shap_values.ndim == 3:
+            sv = shap_values[:, :, 1]     # new: pick class-1 slice
         else:
-            sv = shap_values
+            sv = shap_values              # already (n_samples, n_features)
 
         mean_abs_shap = np.abs(sv).mean(axis=0)
         top_idx = np.argsort(mean_abs_shap)[::-1][:10]
 
         top_features = [
             {
-                "feature": feature_names[i],
-                "mean_abs_shap": round(float(mean_abs_shap[i]), 4),
-                "direction": "positive" if sv[:, i].mean() > 0 else "negative",
+                "feature": feature_names[int(i)],
+                "mean_abs_shap": round(float(mean_abs_shap[int(i)]), 4),
+                "direction": "positive" if sv[:, int(i)].mean() > 0 else "negative",
             }
             for i in top_idx
         ]
@@ -239,8 +241,8 @@ def compute_shap_values(pipeline, X_sample: pd.DataFrame, feature_names: list) -
             print(f"  {f['feature']}: {f['mean_abs_shap']} ({f['direction']})")
         return top_features
 
-    except ImportError:
-        print("SHAP not installed — skipping SHAP computation.")
+    except Exception as e:
+        print(f"[WARN] SHAP skipped: {e}")
         return []
 
 
@@ -262,17 +264,20 @@ def single_prediction_shap(pipeline, input_dict: dict, feature_names: list) -> l
         explainer = shap.TreeExplainer(clf)
         shap_values = explainer.shap_values(X_enc)
 
+        # Handle old API (list) and new SHAP ≥0.41 (3D ndarray: n_samples, n_features, n_classes)
         if isinstance(shap_values, list):
-            sv = shap_values[1][0]
+            sv = shap_values[1][0]        # old: class1 array, first sample
+        elif shap_values.ndim == 3:
+            sv = shap_values[0, :, 1]     # new: first sample, all features, class1
         else:
-            sv = shap_values[0]
+            sv = shap_values[0]           # already (n_samples, n_features)
 
         top_idx = np.argsort(np.abs(sv))[::-1][:4]
         return [
             {
-                "feature": feature_names[i],
-                "value": round(float(sv[i]), 3),
-                "direction": "positive" if sv[i] > 0 else "negative",
+                "feature": feature_names[int(i)],
+                "value": round(float(sv[int(i)]), 3),
+                "direction": "positive" if sv[int(i)] > 0 else "negative",
             }
             for i in top_idx
         ]
@@ -296,15 +301,15 @@ def main():
     priority_pipeline, priority_metrics, feature_names = train_priority_model(df)
     closure_pipeline, closure_metrics, _ = train_closure_model(df)
 
-    # SHAP on a sample
-    sample_df = df[ALL_FEATURES].dropna().sample(min(500, len(df)), random_state=42)
-    shap_top = compute_shap_values(priority_pipeline, sample_df, feature_names)
-
-    # Save models
+    # Save models BEFORE SHAP so they are always persisted even if SHAP fails
     joblib.dump(priority_pipeline, MODELS_DIR / "priority_model.pkl")
     joblib.dump(closure_pipeline, MODELS_DIR / "closure_model.pkl")
     print(f"\n✅ Saved priority_model.pkl → {MODELS_DIR}")
     print(f"✅ Saved closure_model.pkl  → {MODELS_DIR}")
+
+    # SHAP on a sample (runs after save — failure here doesn't lose models)
+    sample_df = df[ALL_FEATURES].dropna().sample(min(500, len(df)), random_state=42)
+    shap_top = compute_shap_values(priority_pipeline, sample_df, feature_names)
 
     # Save feature names for inference
     with open(MODELS_DIR / "classifier_feature_names.json", "w") as f:

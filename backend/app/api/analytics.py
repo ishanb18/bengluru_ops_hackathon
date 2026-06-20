@@ -24,8 +24,7 @@ router = APIRouter(prefix="/analytics", tags=["Analytics"])
 @router.get("/corridor-risk", response_model=List[CorridorRiskItem])
 def corridor_risk(db: Session = Depends(get_db)):
     """Return real-time corridor risk scores based on active incidents."""
-    
-    # Query live events per corridor
+
     query = db.query(
         Event.corridor,
         func.count(Event.id).label("incident_count"),
@@ -36,17 +35,29 @@ def corridor_risk(db: Session = Depends(get_db)):
         Event.corridor != "Non-corridor"
     ).group_by(Event.corridor).order_by(desc("incident_count")).limit(20)
 
-    items = []
-    for rank, row in enumerate(query.all(), 1):
+    rows = query.all()
+    if not rows:
+        return []
+
+    # Raw score per corridor
+    raw_scores = []
+    for row in rows:
         count = row.incident_count or 1
-        pct_high = (row.high_prio_count / count) * 100
-        pct_closure = (row.closure_count / count) * 100
-        
-        # Calculate live risk score (arbitrary weights: 1 base, 2 high prio, 3 closure)
-        score = round((count * 1.0) + (row.high_prio_count * 2.0) + (row.closure_count * 3.0), 1)
-        
-        if score > 15: risk_tier = "High"
-        elif score > 5: risk_tier = "Medium"
+        score = (count * 1.0) + ((row.high_prio_count or 0) * 2.0) + ((row.closure_count or 0) * 3.0)
+        raw_scores.append(score)
+
+    max_score = max(raw_scores) if raw_scores else 1
+
+    items = []
+    for rank, (row, raw) in enumerate(zip(rows, raw_scores), 1):
+        count = row.incident_count or 1
+        # Normalize to 0–100
+        score = round((raw / max_score) * 100, 1)
+        pct_high = round(((row.high_prio_count or 0) / count) * 100, 1)
+        pct_closure = round(((row.closure_count or 0) / count) * 100, 1)
+
+        if score > 70: risk_tier = "High"
+        elif score > 35: risk_tier = "Medium"
         else: risk_tier = "Low"
 
         items.append(CorridorRiskItem(
@@ -55,11 +66,11 @@ def corridor_risk(db: Session = Depends(get_db)):
             risk_score=score,
             risk_tier=risk_tier,
             incident_count=count,
-            pct_high_priority=round(pct_high, 1),
-            pct_road_closures=round(pct_closure, 1),
-            event_cause_top="Dynamic Live Causes" 
+            pct_high_priority=pct_high,
+            pct_road_closures=pct_closure,
+            event_cause_top="Dynamic Live Causes"
         ))
-    
+
     return items
 
 
@@ -110,23 +121,36 @@ def top_junctions(db: Session = Depends(get_db)):
 
 @router.get("/peak-hours", response_model=List[ZonePeakHour])
 def peak_hours(db: Session = Depends(get_db)):
-    """Return live zone stats."""
-    
-    query = db.query(
-        Event.corridor,
-        func.count(Event.id).label("count")
-    ).filter(Event.status == "active").group_by(Event.corridor).order_by(desc("count")).limit(5).all()
+    """Return the actual peak hour per corridor from historical data."""
 
-    current_hour = datetime.now().hour
-    return [
-        ZonePeakHour(
-            zone=row.corridor,
-            peak_hour=current_hour,
-            peak_hour_label=f"{current_hour:02d}:00 - {(current_hour + 1) % 24:02d}:00",
-            incident_count=row.count,
-        )
-        for row in query
-    ]
+    # For each corridor, find the hour with the most incidents (from full history)
+    from sqlalchemy import text
+    rows = db.execute(text("""
+        SELECT corridor, hour, COUNT(*) as cnt
+        FROM events
+        WHERE corridor IS NOT NULL AND corridor != '' AND corridor != 'Non-corridor'
+        GROUP BY corridor, hour
+        ORDER BY corridor, cnt DESC
+    """)).fetchall()
+
+    # Keep only the top hour per corridor
+    seen = {}
+    for row in rows:
+        if row[0] not in seen:
+            seen[row[0]] = (row[1], row[2])  # (peak_hour, count)
+
+    # Sort by count descending, take top 5
+    top5 = sorted(seen.items(), key=lambda x: x[1][1], reverse=True)[:5]
+
+    result = []
+    for corridor, (hour, count) in top5:
+        result.append(ZonePeakHour(
+            zone=corridor,
+            peak_hour=hour,
+            peak_hour_label=f"{hour:02d}:00 – {(hour + 1) % 24:02d}:00",
+            incident_count=count,
+        ))
+    return result
 
 
 # ── Summary Stats ─────────────────────────────────────────────────────────────

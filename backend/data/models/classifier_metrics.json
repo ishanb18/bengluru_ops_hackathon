@@ -1,63 +1,114 @@
 {
   "priority_model": {
     "target": "Priority (High=1 / Low=0)",
-    "accuracy": 0.7587,
-    "f1_weighted": 0.7618,
+    "accuracy": 1.0,
+    "f1_weighted": 1.0,
     "confusion_matrix": [
       [
-        397,
-        236
+        330,
+        0
       ],
       [
         0,
-        345
+        648
       ]
     ],
     "classification_report": {
       "0": {
         "precision": 1.0,
-        "recall": 0.627172195892575,
-        "f1-score": 0.7708737864077669,
-        "support": 633.0
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 330.0
       },
       "1": {
-        "precision": 0.5938037865748709,
+        "precision": 1.0,
         "recall": 1.0,
-        "f1-score": 0.7451403887688985,
-        "support": 345.0
+        "f1-score": 1.0,
+        "support": 648.0
       },
-      "accuracy": 0.7586912065439673,
+      "accuracy": 1.0,
       "macro avg": {
-        "precision": 0.7969018932874354,
-        "recall": 0.8135860979462874,
-        "f1-score": 0.7580070875883327,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
         "support": 978.0
       },
       "weighted avg": {
-        "precision": 0.8567099247119944,
-        "recall": 0.7586912065439673,
-        "f1-score": 0.761796054111847,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
         "support": 978.0
       }
     }
   },
   "closure_model": {
     "target": "Road Closure",
-    "accuracy": 0.8947,
-    "f1_weighted": 0.8979,
-    "f1_macro": 0.4996,
-    "optimal_threshold": 0.35,
+    "accuracy": 0.9335,
+    "f1_weighted": 0.9287,
+    "f1_macro": 0.5375,
+    "optimal_threshold": 0.45,
     "smote_used": true,
     "confusion_matrix": [
       [
-        872,
-        55
+        909,
+        27
       ],
       [
-        48,
-        3
+        38,
+        4
       ]
     ]
   },
-  "shap_top_features": []
+  "shap_top_features": [
+    {
+      "feature": "corridor_Non-corridor",
+      "mean_abs_shap": 0.3482,
+      "direction": "positive"
+    },
+    {
+      "feature": "corridor_Mysore Road",
+      "mean_abs_shap": 0.0401,
+      "direction": "positive"
+    },
+    {
+      "feature": "corridor_Bellary Road 1",
+      "mean_abs_shap": 0.0338,
+      "direction": "positive"
+    },
+    {
+      "feature": "corridor_Tumkur Road",
+      "mean_abs_shap": 0.0236,
+      "direction": "positive"
+    },
+    {
+      "feature": "corridor_Bellary Road 2",
+      "mean_abs_shap": 0.0162,
+      "direction": "positive"
+    },
+    {
+      "feature": "corridor_Hosur Road",
+      "mean_abs_shap": 0.0094,
+      "direction": "positive"
+    },
+    {
+      "feature": "corridor_Old Madras Road",
+      "mean_abs_shap": 0.0092,
+      "direction": "positive"
+    },
+    {
+      "feature": "corridor_Magadi Road",
+      "mean_abs_shap": 0.0084,
+      "direction": "negative"
+    },
+    {
+      "feature": "corridor_ORR East 1",
+      "mean_abs_shap": 0.0065,
+      "direction": "positive"
+    },
+    {
+      "feature": "corridor_ORR North 1",
+      "mean_abs_shap": 0.0063,
+      "direction": "negative"
+    }
+  ]
 }

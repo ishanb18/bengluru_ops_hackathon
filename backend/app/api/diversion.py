@@ -111,11 +111,11 @@ async def get_diversions(corridor_name: str):
         
         # Calculate extra minutes compared to a traffic-free primary route, or just absolute delay
         extra_minutes = round(traffic_delay / 60.0)
-        stress_score = min(100, extra_minutes * 3.5) # Arbitrary stress mapping for UI
-        
+        stress_score = min(100, round(extra_minutes * 3.5, 1))
+
         if stress_score < 30:
             stress_level = "Low"
-        elif stress_score < 60:
+        elif stress_score < 65:
             stress_level = "Medium"
         else:
             stress_level = "High"
