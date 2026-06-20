@@ -72,9 +72,19 @@ def sync_tomtom_incidents(db: Session):
 
     logger.info(f"[TomTom Sync] Fetched {len(incidents)} live incidents. Processing via ML pipeline...")
 
-    # Clear old active TomTom incidents
-    db.query(Event).filter(Event.status == "active", Event.authenticated == False).delete()
-    
+    # Clear old active TomTom incidents — use synchronize_session=False for a fast
+    # direct SQL DELETE that doesn't load rows into memory first (prevents DB lock)
+    try:
+        db.query(Event).filter(
+            Event.status == "active", Event.authenticated == False
+        ).delete(synchronize_session=False)
+        db.commit()   # release the write lock immediately before inserting
+    except Exception as e:
+        logger.error(f"[TomTom Sync] Delete failed: {e}")
+        db.rollback()
+        return
+
+
     current_hour = datetime.now(timezone.utc).hour
     weekday = datetime.now(timezone.utc).weekday()
     month = datetime.now(timezone.utc).month
