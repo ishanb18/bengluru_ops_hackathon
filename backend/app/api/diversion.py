@@ -56,32 +56,56 @@ STATIC_DIVERSIONS = {
 }
 
 
+def _is_major_road(name: str) -> bool:
+    """Heuristic: identify major/named roads vs tiny local streets."""
+    if not name or len(name) < 6:
+        return False
+    major_keywords = [
+        "tumkur", "mysore", "hosur", "bellary", "magadi", "nice road",
+        "bannerghatta", "old madras", "outer ring", "orr", "nh ", "sh ",
+        "100 feet", "80 ft", "60 feet", "subedar", "ramaiah", "hmt",
+        "pipeline", "chord", "airport", "expressway", "flyover", "highway",
+        "ring road", "shankar nagar", "ms ramaiah", "yeshwanthpur",
+    ]
+    name_lower = name.lower()
+    return any(kw in name_lower for kw in major_keywords)
+
+
 def _extract_route_name(route: dict, idx: int) -> str:
     """
-    Parse TomTom guidance instructions to build a human-readable route name
-    from the actual road segments used, e.g. 'Via Outer Ring Road → Bannerghatta Road'.
-    Falls back to 'Alternate Route N' if instructions are unavailable.
+    Parse TomTom guidance.instructions to build a human-readable route name.
+    Prioritises major/named Bengaluru roads. Falls back gracefully.
     """
     try:
-        guidance = route.get("guidance", {})
-        instructions = guidance.get("instructions", [])
-        # Collect road names from significant maneuvers (ROAD_CHANGE, TURN, ROUNDABOUT)
-        roads_seen: list[str] = []
-        for inst in instructions:
-            road = (inst.get("street") or "").strip()
-            road_nums = inst.get("roadNumbers", [])
-            label = " / ".join(road_nums) if road_nums else road
-            # Skip unnamed segments, very short names (like "A") and duplicates
-            if label and len(label) > 3 and label not in roads_seen:
-                roads_seen.append(label)
+        instructions = route.get("guidance", {}).get("instructions", [])
+        seen: list[str] = []
+        skip_types = {"DEPART", "ARRIVE"}
 
-        # Take the first 3 distinct major roads (skip service lanes etc.)
-        major = [r for r in roads_seen if not r.startswith(("Slip", "Service", "Ramp"))][:3]
+        for inst in instructions:
+            if inst.get("maneuver", "") in skip_types:
+                continue  # skip origin/destination — always a local street
+            street = (inst.get("street") or "").strip()
+            if street and street not in seen and len(street) > 5:
+                seen.append(street)
+
+        # Priority 1: actual major/named roads
+        major = [r for r in seen if _is_major_road(r)][:3]
+
+        # Priority 2: longest road names tend to be more significant
+        if not major:
+            major = sorted([r for r in seen if len(r) > 8], key=len, reverse=True)[:3]
+
+        # Priority 3: any road longer than 5 chars
+        if not major:
+            major = [r for r in seen if len(r) > 5][:3]
+
         if major:
-            return "Via " + " → ".join(major)
-    except Exception:
-        pass
+            return "Via " + " > ".join(major)
+    except Exception as e:
+        logger.warning(f"Route name extraction failed: {e}")
+
     return f"Alternate Route {idx + 1}"
+
 
 
 @router.get("/{corridor_name}")
