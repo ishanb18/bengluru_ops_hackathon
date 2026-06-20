@@ -57,7 +57,7 @@ def classify_incident(request: ClassifyRequest):
     Classify an incoming traffic event.
     Returns: priority, road closure prediction, confidence, SHAP explanation, action recommendation.
     """
-    data = request.dict()
+    data = request.model_dump()
 
     # Run predictions
     priority_result = predict_priority(data)

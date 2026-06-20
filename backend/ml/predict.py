@@ -10,6 +10,24 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 from functools import lru_cache
+import sys
+from sklearn.pipeline import Pipeline
+
+# ── Dynamic Model Registration for Uvicorn ──────────────────────────────────────
+# Fixes joblib unpickling error since model was trained in __main__ context
+class XGBLabelEncoderPipeline(Pipeline):
+    def __init__(self, steps, le=None, *, memory=None, verbose=False):
+        super().__init__(steps, memory=memory, verbose=verbose)
+        self.le = le
+    def predict(self, X, **predict_params):
+        return self.le.inverse_transform(super().predict(X, **predict_params))
+    def predict_proba(self, X, **predict_proba_params):
+        return super().predict_proba(X, **predict_proba_params)
+    @property
+    def classes_(self):
+        return self.le.classes_
+
+sys.modules["__main__"].XGBLabelEncoderPipeline = XGBLabelEncoderPipeline
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 MODELS_DIR = BASE_DIR / "data" / "models"
@@ -41,10 +59,13 @@ def _unwrap(obj):
 
     # Priority 2: reconstruct Pipeline from separate preprocessor + classifier
     preprocessor = obj.get("preprocessor")
-    for key in ("pipeline", "model", "classifier", "clf", "estimator"):
-        if key in obj and hasattr(obj[key], "predict_proba"):
+    label_encoder = obj.get("label_encoder")
+    for key in ("pipeline", "model", "classifier", "clf", "estimator", "regressor"):
+        if key in obj and (hasattr(obj[key], "predict_proba") or hasattr(obj[key], "predict")):
             clf = obj[key]
             if preprocessor is not None and hasattr(preprocessor, "transform"):
+                if label_encoder is not None:
+                    return XGBLabelEncoderPipeline([("preprocessor", preprocessor), ("classifier", clf)], le=label_encoder)
                 from sklearn.pipeline import Pipeline as SKPipeline
                 return SKPipeline([("preprocessor", preprocessor), ("classifier", clf)])
             return clf
@@ -124,8 +145,22 @@ def build_input_df(data: dict) -> pd.DataFrame:
     WEEKDAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday",
                      "Friday", "Saturday", "Sunday"]
 
+    cause = data.get("event_cause", "vehicle_breakdown")
+    cause_mapping = {
+        "Jam": "congestion",
+        "Stationary Traffic": "congestion",
+        "Queueing Traffic": "congestion",
+        "abandoned_vehicle": "vehicle_breakdown",
+        "oil_spill": "accident",
+        "pedestrian_incident": "accident",
+        "road_closed": "construction", # proxy for closure
+        "lane_closed": "construction",
+        "pot_holes": "pot_holes"
+    }
+    mapped_cause = cause_mapping.get(cause, cause)
+
     row = {
-        "event_cause": data.get("event_cause", "vehicle_breakdown"),
+        "event_cause": mapped_cause,
         "corridor": data.get("corridor", "Non-corridor"),
         "zone": data.get("zone", "Unknown"),
         "veh_type": data.get("veh_type", "N/A"),
@@ -152,6 +187,9 @@ def predict_priority(data: dict) -> dict:
     classes = pipeline.classes_
     pred_class = classes[np.argmax(proba)]
     confidence = float(np.max(proba))
+    
+    # Soften extreme confidences for presentation
+    confidence = min(0.97, confidence) if confidence > 0.97 else confidence
 
     return {
         "priority": "High" if pred_class == 1 else "Low",
@@ -165,13 +203,25 @@ def predict_priority(data: dict) -> dict:
 
 
 def predict_closure(data: dict) -> dict:
-    """Return road closure prediction with confidence."""
+    """Return road closure prediction with confidence using ML blended with domain rules."""
     pipeline = load_closure_model()
     X = build_input_df(data)
     proba = pipeline.predict_proba(X)[0]
-    classes = pipeline.classes_
-    pred_class = classes[np.argmax(proba)]
-    confidence = float(np.max(proba))
+    
+    # ML Prediction (0.50 threshold since we used class_weight='balanced')
+    pred_class = 1 if proba[1] >= 0.50 else 0
+    confidence = float(proba[1]) if pred_class == 1 else float(proba[0])
+
+    # Domain Knowledge Overrides (Safety Net for extreme events)
+    raw_cause = data.get("event_cause", "")
+    veh_type = data.get("veh_type", "")
+    
+    if raw_cause in ["road_closed", "lane_closed", "tree_fall", "water_logging"]:
+        pred_class = 1
+        confidence = max(0.95, confidence)
+    elif raw_cause == "accident" and veh_type in ["heavy_vehicle", "bus"]:
+        pred_class = 1
+        confidence = max(0.85, confidence)
 
     return {
         "requires_closure": bool(pred_class),

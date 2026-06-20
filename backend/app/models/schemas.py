@@ -132,6 +132,8 @@ class ManpowerRequest(BaseModel):
     corridor: str = Field(default="Non-corridor")
     duration_bucket: str = Field(default="Medium", example="Medium")
     veh_type: str = Field(default="N/A")
+    latitude: float = Field(default=12.9716)
+    longitude: float = Field(default=77.5946)
 
 
 class StationInfo(BaseModel):

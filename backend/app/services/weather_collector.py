@@ -82,6 +82,7 @@ def sync_weather(db: Session) -> dict | None:
         "condition": condition,
         "rainfall_mm": rainfall_mm,
         "visibility_m": visibility_m,
+        "wind_speed_kmh": wind_speed_kmh,
         "temperature_c": main.get("temp"),
     }
 

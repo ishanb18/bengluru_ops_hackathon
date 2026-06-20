@@ -23,7 +23,7 @@ def list_incidents(
     date_from: Optional[str] = Query(None, description="YYYY-MM-DD"),
     date_to: Optional[str] = Query(None, description="YYYY-MM-DD"),
     page: int = Query(1, ge=1),
-    page_size: int = Query(50, ge=1, le=200),
+    page_size: int = Query(500, ge=1, le=2000),
     db: Session = Depends(get_db),
 ):
     """Return paginated list of incidents with geo + key fields for map rendering."""

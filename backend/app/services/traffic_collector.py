@@ -17,19 +17,45 @@ logger = logging.getLogger(__name__)
 
 TOMTOM_FLOW_URL = "https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/10/json"
 
-# Mid-point coordinates for each monitored Bengaluru corridor
-CORRIDOR_WAYPOINTS = {
-    "Tumkur Road":      (13.032, 77.538),
-    "Mysore Road":      (12.933, 77.510),
-    "Bellary Road":     (13.033, 77.591),
-    "Hosur Road":       (12.885, 77.645),
-    "ORR East":         (12.939, 77.667),
-    "ORR West":         (12.997, 77.535),
-    "Old Madras Road":  (12.993, 77.660),
-    "Hebbal":           (13.043, 77.596),
-    "Electronic City":  (12.845, 77.665),
-    "Silk Board":       (12.917, 77.623),
-}
+def get_dynamic_waypoints(db: Session) -> dict[str, tuple[float, float]]:
+    """
+    Dynamically calculates monitoring waypoints based on the geographical centroid
+    of active incidents in the database, replacing hardcoded GPS dictionaries.
+    """
+    from sqlalchemy import func
+    
+    # Get active incidents grouped by corridor
+    active_centroids = db.query(
+        Event.corridor,
+        func.avg(Event.latitude).label("lat"),
+        func.avg(Event.longitude).label("lon")
+    ).filter(
+        Event.status == "active",
+        Event.corridor != "Non-corridor",
+        Event.latitude.isnot(None),
+        Event.longitude.isnot(None)
+    ).group_by(Event.corridor).all()
+    
+    waypoints = {row.corridor: (row.lat, row.lon) for row in active_centroids}
+    
+    # If there are less than 5 active corridors, fetch historical top hotspots as baseline
+    if len(waypoints) < 5:
+        historical = db.query(
+            Event.corridor,
+            func.avg(Event.latitude).label("lat"),
+            func.avg(Event.longitude).label("lon"),
+            func.count(Event.id).label("cnt")
+        ).filter(
+            Event.corridor != "Non-corridor",
+            Event.latitude.isnot(None),
+            Event.longitude.isnot(None)
+        ).group_by(Event.corridor).order_by(func.count(Event.id).desc()).limit(10).all()
+        
+        for row in historical:
+            if row.corridor not in waypoints:
+                waypoints[row.corridor] = (row.lat, row.lon)
+                
+    return waypoints
 
 
 def _predict_risk(congestion: float, hour: int, rainfall_mm: float) -> tuple[str, str]:
@@ -72,24 +98,46 @@ def _fetch_corridor_flow(corridor: str, lat: float, lon: float) -> dict | None:
         )
         response.raise_for_status()
         data = response.json()
-        fsd = data.get("flowSegmentData", {})
-        current_speed = fsd.get("currentSpeed")
-        free_flow = fsd.get("freeFlowSpeed")
-        confidence = fsd.get("confidence", 1.0)
-
-        if current_speed is None or free_flow is None or free_flow == 0:
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code in [403, 429] and settings.TOMTOM_API_KEY_FALLBACK:
+            logger.warning(f"[Traffic] Primary key failed ({e.response.status_code}). Using Fallback Key...")
+            try:
+                response = httpx.get(
+                    TOMTOM_FLOW_URL,
+                    params={
+                        "key": settings.TOMTOM_API_KEY_FALLBACK,
+                        "point": f"{lat},{lon}",
+                        "unit": "KMPH",
+                    },
+                    timeout=8.0,
+                )
+                response.raise_for_status()
+                data = response.json()
+            except Exception as e2:
+                logger.error(f"[Traffic] Fallback key also failed: {e2}")
+                return None
+        else:
+            logger.warning(f"[Traffic] Flow API failed for {corridor}: {e}")
             return None
-
-        congestion = max(0.0, round((1 - current_speed / free_flow) * 100, 1))
-        return {
-            "current_speed": round(float(current_speed), 1),
-            "free_flow_speed": round(float(free_flow), 1),
-            "congestion_percent": congestion,
-            "confidence": round(float(confidence), 3),
-        }
     except Exception as e:
         logger.warning(f"[Traffic] Flow API failed for {corridor}: {e}")
         return None
+
+    fsd = data.get("flowSegmentData", {})
+    current_speed = fsd.get("currentSpeed")
+    free_flow = fsd.get("freeFlowSpeed")
+    confidence = fsd.get("confidence", 1.0)
+
+    if current_speed is None or free_flow is None or free_flow == 0:
+        return None
+
+    congestion = max(0.0, round((1 - current_speed / free_flow) * 100, 1))
+    return {
+        "current_speed": round(float(current_speed), 1),
+        "free_flow_speed": round(float(free_flow), 1),
+        "congestion_percent": congestion,
+        "confidence": round(float(confidence), 3),
+    }
 
 
 def _count_active_incidents(db: Session, corridor_name: str) -> int:
@@ -120,11 +168,19 @@ def sync_traffic(db: Session, weather_context: dict | None = None) -> list[dict]
     rainfall = weather.get("rainfall_mm", 0.0)
     condition = weather.get("condition", "Clear")
 
-    snapshots = []
-    for corridor, (lat, lon) in CORRIDOR_WAYPOINTS.items():
+    # Step 1: Gather data (Network + Read-only queries) WITHOUT acquiring a write lock
+    corridor_data = []
+    dynamic_waypoints = get_dynamic_waypoints(db)
+    for corridor, (lat, lon) in dynamic_waypoints.items():
         flow = _fetch_corridor_flow(corridor, lat, lon)
         incident_count = _count_active_incidents(db, corridor)
+        corridor_data.append((corridor, flow, incident_count))
 
+    # Step 2: Build objects and insert into DB in one fast atomic operation
+    snapshots = []
+    db_objects = []
+    
+    for corridor, flow, incident_count in corridor_data:
         if flow:
             risk_30, risk_60 = _predict_risk(flow["congestion_percent"], hour, rainfall)
             snap = TrafficSnapshot(
@@ -154,34 +210,40 @@ def sync_traffic(db: Session, weather_context: dict | None = None) -> list[dict]
                 "confidence": flow["confidence"],
             }
         else:
-            # API unavailable — store a null snapshot so we have a timestamp record
+            # No flow data — estimate risk from incident count + time of day
+            estimated_congestion = min(100, incident_count * 15 + (20 if (8 <= hour <= 10 or 17 <= hour <= 20) else 0))
+            risk_30, risk_60 = _predict_risk(estimated_congestion, hour, rainfall)
+            status = _congestion_status(estimated_congestion)
             snap = TrafficSnapshot(
                 timestamp=now.replace(tzinfo=None),
                 corridor=corridor,
                 weather_condition=condition,
                 rainfall_mm=rainfall,
                 incident_count=incident_count,
+                risk_30min=risk_30,
+                risk_60min=risk_60,
             )
             summary = {
                 "corridor": corridor,
                 "current_speed": None,
                 "free_flow_speed": None,
-                "congestion_percent": None,
-                "status": "Unknown",
+                "congestion_percent": estimated_congestion if incident_count > 0 else None,
+                "status": status if incident_count > 0 else "Low",
                 "incident_count": incident_count,
-                "risk_30min": None,
-                "risk_60min": None,
+                "risk_30min": risk_30,
+                "risk_60min": risk_60,
                 "weather": condition,
                 "rainfall_mm": rainfall,
                 "confidence": None,
             }
 
-        db.add(snap)
+        db_objects.append(snap)
         snapshots.append(summary)
 
     try:
+        db.bulk_save_objects(db_objects)
         db.commit()
-        logger.info(f"[Traffic] Stored {len(CORRIDOR_WAYPOINTS)} corridor snapshots.")
+        logger.info(f"[Traffic] Stored {len(dynamic_waypoints)} corridor snapshots.")
     except Exception as e:
         db.rollback()
         logger.error(f"[Traffic] DB write failed: {e}")

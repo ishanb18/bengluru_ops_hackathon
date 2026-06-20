@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API = "http://127.0.0.1:8000";
 
 const RISK_COLOR = {
   Low: "var(--green)",
@@ -72,6 +72,34 @@ export default function FutureRisk() {
     );
   };
 
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefreshForecast = async () => {
+    setRefreshing(true);
+    try {
+      // 1. Trigger a TomTom incident scan
+      await fetch(`${API}/api/scan`, { method: "POST" });
+      // 2. Wait a moment for data to settle, then re-fetch forecast
+      await new Promise(r => setTimeout(r, 500));
+      const [forecastRes, weatherRes] = await Promise.all([
+        fetch(`${API}/api/traffic/forecast`),
+        fetch(`${API}/api/traffic/weather`),
+      ]);
+      if (forecastRes.ok) {
+        const d = await forecastRes.json();
+        setForecast(d.corridors || []);
+        setLastUpdate(new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }));
+      }
+      if (weatherRes.ok) {
+        setWeather(await weatherRes.json());
+      }
+    } catch (e) {
+      console.error("Refresh forecast failed:", e);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   return (
     <div className="screen active">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
@@ -131,7 +159,7 @@ export default function FutureRisk() {
           </div>
         ) : forecast.length === 0 ? (
           <div style={{ color: "var(--text-secondary)", textAlign: "center", padding: "30px", fontSize: "13px" }}>
-            Forecast unavailable — traffic snapshots populate after first 10-minute poll cycle.
+            Forecast unavailable — click "Refresh Forecast" below to populate live data.
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
@@ -179,9 +207,19 @@ export default function FutureRisk() {
         )}
       </div>
 
-      {/* Risk Legend */}
+      {/* Risk Legend + Refresh Button */}
       <div className="card" style={{ marginTop: "16px" }}>
-        <div className="card-title" style={{ marginBottom: "10px" }}>Risk Classification</div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+          <div className="card-title" style={{ marginBottom: 0 }}>Risk Classification</div>
+          <button
+            className="btn btn-scan"
+            onClick={handleRefreshForecast}
+            disabled={refreshing}
+            style={{ padding: "7px 14px", fontSize: "12px" }}
+          >
+            {refreshing ? "⏳ Refreshing..." : "🔄 Refresh Forecast"}
+          </button>
+        </div>
         <div style={{ display: "flex", gap: "24px", flexWrap: "wrap", fontSize: "12px" }}>
           {[
             { label: "Low", desc: "< 35% congestion. Free flowing traffic.", color: "var(--green)" },

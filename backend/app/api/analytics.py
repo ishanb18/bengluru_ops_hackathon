@@ -85,12 +85,16 @@ def hourly_trend(db: Session = Depends(get_db)):
         func.count(Event.id).label("count")
     ).filter(Event.status == "active").group_by(Event.hour).order_by(Event.hour).all()
     
-    # Map hour integer to string month name to satisfy the MonthlyTrend schema in the frontend
-    hour_map = {0: "12 AM", 4: "4 AM", 8: "8 AM", 12: "12 PM", 16: "4 PM", 20: "8 PM"}
+    def format_hour(h: int | None) -> str:
+        if h is None: return "Unknown"
+        if h == 0: return "12 AM"
+        if h < 12: return f"{h} AM"
+        if h == 12: return "12 PM"
+        return f"{h-12} PM"
     
     return [
         MonthlyTrend(
-            month=hour_map.get(row.hour, f"{row.hour}:00"), 
+            month=format_hour(row.hour), 
             incident_count=row.count
         )
         for row in query

@@ -98,6 +98,12 @@ export default function AICommand({
               <option value="public_event">Public event</option>
               <option value="pot_holes">Pot holes</option>
               <option value="tree_fall">Tree fall</option>
+              <option value="Stationary Traffic">Stationary Traffic</option>
+              <option value="Jam">Jam</option>
+              <option value="Queueing Traffic">Queueing Traffic</option>
+              <option value="abandoned_vehicle">Abandoned Vehicle</option>
+              <option value="oil_spill">Oil Spill</option>
+              <option value="pedestrian_incident">Pedestrian Incident</option>
               <option value="others">Other / Debris</option>
             </select>
           </div>

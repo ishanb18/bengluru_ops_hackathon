@@ -1,14 +1,37 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import LiveMap from "./components/LiveMap";
 import AICommand from "./components/AICommand";
 import Diversion from "./components/Diversion";
 import Analytics from "./components/Analytics";
 import FutureRisk from "./components/FutureRisk";
 
-const BACKEND_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const BACKEND_URL = "http://127.0.0.1:8000";
+
+// ── Toast Notification System ───────────────────────────────────────────
+function ToastContainer({ toasts }) {
+  return (
+    <div className="toast-container">
+      {toasts.map((t) => (
+        <div key={t.id} className={`toast ${t.exiting ? "toast-exit" : ""}`}>
+          <span className="toast-icon">{t.icon}</span>
+          <span>{t.message}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Navigation items
+const NAV_ITEMS = [
+  { icon: "🗺", label: "Live Monitor", id: 0 },
+  { icon: "🔮", label: "AI Command Predictor", id: 1 },
+  { icon: "🔀", label: "Diversion Suggestion", id: 2 },
+  { icon: "📊", label: "Analytics Dashboard", id: 3 },
+  { icon: "⚡", label: "Future Risk View", id: 4 },
+];
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState(0); // 0: Live Monitor, 1: AI Predictor, 2: Diversions, 3: Analytics
+  const [activeTab, setActiveTab] = useState(0);
   const [events, setEvents] = useState([]);
   const [stats, setStats] = useState({
     total_incidents: 0,
@@ -18,6 +41,28 @@ export default function App() {
   });
 
   const [availableCorridors, setAvailableCorridors] = useState([]);
+  const [darkMode, setDarkMode] = useState(() => {
+    return localStorage.getItem("bengaluruops-theme") === "dark";
+  });
+
+  // Toast state
+  const [toasts, setToasts] = useState([]);
+  const addToast = useCallback((icon, message) => {
+    const id = Date.now();
+    setToasts((prev) => [...prev, { id, icon, message, exiting: false }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.map((t) => (t.id === id ? { ...t, exiting: true } : t)));
+      setTimeout(() => {
+        setToasts((prev) => prev.filter((t) => t.id !== id));
+      }, 250);
+    }, 3500);
+  }, []);
+
+  // Apply dark mode
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", darkMode ? "dark" : "light");
+    localStorage.setItem("bengaluruops-theme", darkMode ? "dark" : "light");
+  }, [darkMode]);
 
   // Classifier inputs state
   const [classifierInputs, setClassifierInputs] = useState({
@@ -35,35 +80,36 @@ export default function App() {
   const [manpowerResult, setManpowerResult] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  // Fetch function (reusable for scan refresh)
+  const fetchData = useCallback(async () => {
+    try {
+      const [statsRes, eventsRes, corridorsRes] = await Promise.all([
+        fetch(`${BACKEND_URL}/api/incidents/summary`),
+        fetch(`${BACKEND_URL}/api/incidents?status=active&page_size=1000`),
+        fetch(`${BACKEND_URL}/api/analytics/metadata/corridors`)
+      ]);
+
+      if (statsRes.ok) {
+        const statsData = await statsRes.json();
+        setStats(statsData);
+      }
+
+      if (eventsRes.ok) {
+        const eventsData = await eventsRes.json();
+        setEvents(eventsData.events || []);
+      }
+
+      if (corridorsRes.ok) {
+        const corridorsData = await corridorsRes.json();
+        setAvailableCorridors(corridorsData);
+      }
+    } catch (err) {
+      console.error("Error fetching live map details:", err);
+    }
+  }, []);
+
   // Fetch KPI statistics and active events on load and poll every 10s
   useEffect(() => {
-    async function fetchData() {
-      try {
-        const [statsRes, eventsRes, corridorsRes] = await Promise.all([
-          fetch(`${BACKEND_URL}/api/incidents/summary`),
-          fetch(`${BACKEND_URL}/api/incidents?status=active`),
-          fetch(`${BACKEND_URL}/api/analytics/metadata/corridors`)
-        ]);
-
-        if (statsRes.ok) {
-          const statsData = await statsRes.json();
-          setStats(statsData);
-        }
-
-        if (eventsRes.ok) {
-          const eventsData = await eventsRes.json();
-          setEvents(eventsData.events || []);
-        }
-
-        if (corridorsRes.ok) {
-          const corridorsData = await corridorsRes.json();
-          setAvailableCorridors(corridorsData);
-        }
-      } catch (err) {
-        console.error("Error fetching live map details:", err);
-      }
-    }
-
     fetchData();
     runAIPipeline();
     const interval = setInterval(fetchData, 10000);
@@ -152,6 +198,7 @@ export default function App() {
 
     } catch (err) {
       console.error("Error executing A.I. prediction pipeline:", err);
+      addToast("⚠️", "AI Pipeline failed. Check backend connection.");
     } finally {
       setLoading(false);
     }
@@ -166,7 +213,7 @@ export default function App() {
         
         // Match Cause options
         let causeVal = incident.event_cause || "vehicle_breakdown";
-        const validCauses = ["vehicle_breakdown", "accident", "construction", "water_logging", "vip_movement", "public_event", "pot_holes", "tree_fall", "others"];
+        const validCauses = ["vehicle_breakdown", "accident", "construction", "water_logging", "vip_movement", "public_event", "pot_holes", "tree_fall", "Stationary Traffic", "Jam", "Queueing Traffic", "abandoned_vehicle", "oil_spill", "pedestrian_incident", "others"];
         if (!validCauses.includes(causeVal)) causeVal = "vehicle_breakdown";
 
         // Match Corridor options — use live corridors from API, fall back to a safe default
@@ -200,6 +247,7 @@ export default function App() {
 
         setClassifierInputs(newInputs);
         setActiveTab(1); // Switch to AI Predictor tab
+        addToast("🔮", `AI analyzing: ${causeVal.replace(/_/g, " ")} on ${corridorVal}`);
         runAIPipeline(newInputs); // trigger pipeline
       }
     } catch (err) {
@@ -209,50 +257,48 @@ export default function App() {
 
   return (
     <div className="app-container">
+      {/* Toast Notifications */}
+      <ToastContainer toasts={toasts} />
+
       {/* Left Sidebar Navigation */}
       <aside className="sidebar">
         <div className="logo-container">
-          <div className="logo-text">
-            Bengaluru<span className="logo-accent">Ops</span>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div className="logo-text">
+              Bengaluru<span className="logo-accent">Ops</span>
+            </div>
+            <button
+              className="theme-toggle"
+              onClick={() => setDarkMode(!darkMode)}
+              title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            >
+              {darkMode ? "☀️" : "🌙"}
+            </button>
           </div>
           <span style={{ fontSize: "10px", fontWeight: "700", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-            Traffic Command Center
+            AI Traffic Command Center
           </span>
         </div>
 
         <nav>
           <ul className="sidebar-menu">
-            <li>
-              <button className={`sidebar-link ${activeTab === 0 ? "active" : ""}`} onClick={() => setActiveTab(0)}>
-                🗺 Live Monitor
-              </button>
-            </li>
-            <li>
-              <button className={`sidebar-link ${activeTab === 1 ? "active" : ""}`} onClick={() => setActiveTab(1)}>
-                🔮 AI Command Predictor
-              </button>
-            </li>
-            <li>
-              <button className={`sidebar-link ${activeTab === 2 ? "active" : ""}`} onClick={() => setActiveTab(2)}>
-                🔀 Diversion Suggestion
-              </button>
-            </li>
-            <li>
-              <button className={`sidebar-link ${activeTab === 3 ? "active" : ""}`} onClick={() => setActiveTab(3)}>
-                📊 Analytics Dashboard
-              </button>
-            </li>
-            <li>
-              <button className={`sidebar-link ${activeTab === 4 ? "active" : ""}`} onClick={() => setActiveTab(4)}>
-                🔮 Future Risk View
-              </button>
-            </li>
+            {NAV_ITEMS.map((item) => (
+              <li key={item.id}>
+                <button
+                  className={`sidebar-link ${activeTab === item.id ? "active" : ""}`}
+                  onClick={() => setActiveTab(item.id)}
+                >
+                  <span style={{ fontSize: "15px" }}>{item.icon}</span>
+                  {item.label}
+                </button>
+              </li>
+            ))}
           </ul>
         </nav>
 
         <div className="sidebar-footer">
           <div>Status: <span style={{ color: "var(--green)", fontWeight: "700" }}>● ONLINE</span></div>
-          <div>BTP Operations DB v1.2</div>
+          <div>BTP Operations v2.0</div>
           <div>© Bengaluru Traffic Police</div>
         </div>
       </aside>
@@ -281,26 +327,26 @@ export default function App() {
 
         {/* KPI Counters Bar */}
         <div className="grid4" style={{ marginBottom: "24px" }}>
-          <div className="card">
-            <div className="metric-val">{stats.total_incidents}</div>
+          <div className="card kpi-card kpi-total">
+            <div className="metric-val" key={stats.total_incidents}>{stats.total_incidents.toLocaleString()}</div>
             <div className="metric-lbl">Total database incidents</div>
           </div>
-          <div className="card">
-            <div className="metric-val" style={{ color: "var(--amber)" }}>{stats.active_incidents}</div>
+          <div className="card kpi-card kpi-active">
+            <div className="metric-val" style={{ color: "var(--amber)" }} key={stats.active_incidents}>{stats.active_incidents}</div>
             <div className="metric-lbl">Active congestion alerts</div>
           </div>
-          <div className="card">
-            <div className="metric-val" style={{ color: "var(--red)" }}>{stats.high_priority_active}</div>
+          <div className="card kpi-card kpi-high">
+            <div className="metric-val" style={{ color: "var(--red)" }} key={stats.high_priority_active}>{stats.high_priority_active}</div>
             <div className="metric-lbl">High priority dispatch</div>
           </div>
-          <div className="card">
-            <div className="metric-val" style={{ color: "var(--blue)" }}>{stats.road_closures_active}</div>
+          <div className="card kpi-card kpi-closure">
+            <div className="metric-val" style={{ color: "var(--blue)" }} key={stats.road_closures_active}>{stats.road_closures_active}</div>
             <div className="metric-lbl">Active road closures</div>
           </div>
         </div>
 
         {/* Screen Switcher */}
-        {activeTab === 0 && <LiveMap events={events} onRunAI={runAIForIncident} />}
+        {activeTab === 0 && <LiveMap events={events} onRunAI={runAIForIncident} onScanComplete={fetchData} addToast={addToast} />}
         {activeTab === 1 && (
           <AICommand
             inputs={classifierInputs}
@@ -314,7 +360,7 @@ export default function App() {
           />
         )}
         {activeTab === 2 && <Diversion availableCorridors={availableCorridors} />}
-        {activeTab === 3 && <Analytics />}
+        {activeTab === 3 && <Analytics stats={stats} />}
         {activeTab === 4 && <FutureRisk />}
       </main>
     </div>

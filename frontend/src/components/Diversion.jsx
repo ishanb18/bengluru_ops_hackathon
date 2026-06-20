@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 
+const API = "http://127.0.0.1:8000";
+
 // Top corridors to dynamically pre-fetch summary diversions for the summary panel
 const TOP_CORRIDORS_FOR_PANEL = [
   "Mysore Road", "Bellary Road 1", "ORR East 1", "Hosur Road", "Old Madras Road"
@@ -56,7 +58,7 @@ export default function Diversion({ availableCorridors }) {
           hour: hour.toString()
         });
         const res = await fetch(
-          `http://localhost:8000/api/diversion/${encodeURIComponent(selectedCorridor)}?${queryParams.toString()}`
+          `${API}/api/diversion/${encodeURIComponent(selectedCorridor)}?${queryParams.toString()}`
         );
         if (res.ok) {
           const data = await res.json();
@@ -78,7 +80,7 @@ export default function Diversion({ availableCorridors }) {
   useEffect(() => {
     async function fetchStress() {
       try {
-        const res = await fetch("http://localhost:8000/api/analytics/corridor-risk");
+        const res = await fetch(`${API}/api/analytics/corridor-risk`);
         if (res.ok) {
           const data = await res.json();
           setRoutesStress(data || []);
@@ -99,7 +101,7 @@ export default function Diversion({ availableCorridors }) {
         TOP_CORRIDORS_FOR_PANEL.map(async (corridor) => {
           try {
             const res = await fetch(
-              `http://localhost:8000/api/diversion/${encodeURIComponent(corridor)}`
+              `${API}/api/diversion/${encodeURIComponent(corridor)}`
             );
             if (res.ok) {
               const data = await res.json();

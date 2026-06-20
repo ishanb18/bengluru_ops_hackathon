@@ -15,6 +15,7 @@ class Settings:
     DEBUG: bool = True
     API_PREFIX: str = "/api"
     TOMTOM_API_KEY: str = os.getenv("TOMTOM_API_KEY", "")
+    TOMTOM_API_KEY_FALLBACK: str = os.getenv("TOMTOM_API_KEY_FALLBACK", "")
     GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
     OPENWEATHER_API_KEY: str = os.getenv("OPENWEATHER_API_KEY", "")
 

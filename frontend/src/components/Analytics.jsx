@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 
-export default function Analytics() {
+const API = "http://127.0.0.1:8000";
+
+export default function Analytics({ stats }) {
   const [corridors, setCorridors] = useState([]);
   const [monthlyTrend, setMonthlyTrend] = useState([]);
   const [junctions, setJunctions] = useState([]);
@@ -11,10 +13,10 @@ export default function Analytics() {
     async function fetchAnalytics() {
       try {
         const [corridorsRes, trendRes, junctionsRes, peakRes] = await Promise.all([
-          fetch("http://localhost:8000/api/analytics/corridor-risk"),
-          fetch("http://localhost:8000/api/analytics/monthly-trend"),
-          fetch("http://localhost:8000/api/analytics/top-junctions"),
-          fetch("http://localhost:8000/api/analytics/peak-hours")
+          fetch(`${API}/api/analytics/corridor-risk`),
+          fetch(`${API}/api/analytics/monthly-trend`),
+          fetch(`${API}/api/analytics/top-junctions`),
+          fetch(`${API}/api/analytics/peak-hours`)
         ]);
 
         if (corridorsRes.ok) setCorridors(await corridorsRes.json());
@@ -46,7 +48,7 @@ export default function Analytics() {
       <div className="page-header" style={{ marginBottom: "20px" }}>
         <div>
           <div className="page-title">Post-Event Learning & Analytics</div>
-          <div className="page-sub">Historical database findings on 8,173 traffic events for predictive insights</div>
+          <div className="page-sub">Historical database findings on {stats?.total_incidents?.toLocaleString() || "—"} traffic events for predictive insights</div>
         </div>
       </div>
 

@@ -4,7 +4,7 @@ llm_verifier.py — Web Search + LLM Agent for Real-Time Incident Verification
 
 import os
 import logging
-from duckduckgo_search import DDGS
+import httpx
 from groq import Groq
 import sys
 
@@ -30,15 +30,29 @@ def verify_incident_via_llm(event_cause: str, address: str) -> dict:
         or "openrouter" in groq_api_key.lower()
     )
     # 1. Web Search
-    query = f"Bengaluru traffic {event_cause} near {address} today"
+    clean_address = address.replace("[LIVE]", "").replace("[SIMULATED]", "").replace("Historical:", "").strip()
+    query = f"Bengaluru {clean_address} traffic news {event_cause}"
     search_results = []
     try:
-        with DDGS() as ddgs:
-            results = ddgs.text(query, region='in-en', max_results=3)
-            for r in results:
-                search_results.append(r['body'])
+        tavily_key = "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"
+        response = httpx.post(
+            "https://api.tavily.com/search",
+            json={
+                "api_key": tavily_key,
+                "query": query,
+                "search_depth": "basic",
+                "max_results": 3
+            },
+            timeout=10.0
+        )
+        response.raise_for_status()
+        
+        results = response.json().get("results", [])
+        for r in results:
+            search_results.append(r.get("content", ""))
+            
     except Exception as e:
-        logger.warning(f"DuckDuckGo search failed: {e}")
+        logger.warning(f"Tavily search failed: {e}")
         search_results = ["Search failed or blocked."]
         
     search_context = "\n".join(search_results)
@@ -69,29 +83,42 @@ Return ONLY the JSON object, nothing else.
         base_url="https://openrouter.ai/api/v1" if use_openrouter else None,
     )
 
-    try:
-        completion = client.chat.completions.create(
-            model="openai/gpt-oss-120b" if use_openrouter else "llama-3.3-70b-versatile",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.0,
-            max_tokens=150,
-            response_format={"type": "json_object"}
-        )
-        response_text = completion.choices[0].message.content
-        
-        import json
-        result = json.loads(response_text)
-        
-        score = int(result.get("score", 0))
-        summary = result.get("summary", "Verification complete.")
-        verified = score >= 50
-        
-        return {
-            "score": score,
-            "summary": summary,
-            "verified": verified
-        }
-        
-    except Exception as e:
-        logger.error(f"Groq LLM verification failed: {e}")
-        return {"score": 0, "summary": "LLM error during verification.", "verified": False}
+    models_to_try = [
+        "llama-3.1-8b-instant",
+        "llama3-8b-8192",
+        "mixtral-8x7b-32768",
+        "gemma2-9b-it"
+    ]
+    if use_openrouter:
+        models_to_try = ["openai/gpt-oss-120b"]
+
+    last_error = None
+    for model_name in models_to_try:
+        try:
+            completion = client.chat.completions.create(
+                model=model_name,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.0,
+                max_tokens=150,
+                response_format={"type": "json_object"}
+            )
+            response_text = completion.choices[0].message.content
+            
+            import json
+            result = json.loads(response_text)
+            
+            score = int(result.get("score", 0))
+            summary = result.get("summary", "Verification complete.")
+            verified = score >= 50
+            
+            return {
+                "score": score,
+                "summary": summary,
+                "verified": verified
+            }
+        except Exception as e:
+            logger.warning(f"Groq LLM ({model_name}) verification failed: {e}")
+            last_error = e
+
+    logger.error(f"All Groq models failed verification. Last error: {last_error}")
+    return {"score": 0, "summary": "LLM error: Rate limits exceeded on all fallback models.", "verified": False}
