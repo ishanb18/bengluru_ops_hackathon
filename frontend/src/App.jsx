@@ -3,6 +3,7 @@ import LiveMap from "./components/LiveMap";
 import AICommand from "./components/AICommand";
 import Diversion from "./components/Diversion";
 import Analytics from "./components/Analytics";
+import FutureRisk from "./components/FutureRisk";
 
 const BACKEND_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
@@ -241,6 +242,11 @@ export default function App() {
                 📊 Analytics Dashboard
               </button>
             </li>
+            <li>
+              <button className={`sidebar-link ${activeTab === 4 ? "active" : ""}`} onClick={() => setActiveTab(4)}>
+                🔮 Future Risk View
+              </button>
+            </li>
           </ul>
         </nav>
 
@@ -309,6 +315,7 @@ export default function App() {
         )}
         {activeTab === 2 && <Diversion availableCorridors={availableCorridors} />}
         {activeTab === 3 && <Analytics />}
+        {activeTab === 4 && <FutureRisk />}
       </main>
     </div>
   );

@@ -11,11 +11,12 @@ load_dotenv(BASE_DIR / "backend" / ".env")
 
 class Settings:
     APP_NAME: str = "BengaluruOps Command"
-    APP_VERSION: str = "1.0.0"
+    APP_VERSION: str = "2.0.0"
     DEBUG: bool = True
     API_PREFIX: str = "/api"
     TOMTOM_API_KEY: str = os.getenv("TOMTOM_API_KEY", "")
     GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
+    OPENWEATHER_API_KEY: str = os.getenv("OPENWEATHER_API_KEY", "")
 
     # CORS — allow local dev + any origin in hackathon demo
     CORS_ORIGINS: list = [

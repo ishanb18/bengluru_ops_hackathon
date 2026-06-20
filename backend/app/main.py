@@ -1,7 +1,8 @@
 """
-main.py — BengaluruOps Command
+main.py — BengaluruOps 2.0
 FastAPI application entry point.
-Startup: creates DB tables, seeds data if empty, loads ML models.
+Startup: creates DB tables, seeds historical data, loads ML models,
+and starts three background collectors (TomTom incidents, TomTom flow, OpenWeather).
 """
 
 from fastapi import FastAPI
@@ -12,6 +13,7 @@ import os, sys, logging
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from app.api import incidents, classify, duration, manpower, diversion, analytics
+from app.api import traffic as traffic_router
 from app.models.db import create_tables, SessionLocal
 from app.core.config import settings
 
@@ -23,8 +25,8 @@ app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
     description=(
-        "AI-powered traffic command center for Bengaluru. "
-        "Predicts event impact, recommends manpower, and suggests diversions."
+        "BengaluruOps 2.0 — Real-time traffic intelligence for Bengaluru. "
+        "Live congestion monitoring, AI prediction, weather integration, and diversion routing."
     ),
     docs_url="/docs",
     redoc_url="/redoc",
@@ -46,6 +48,10 @@ app.include_router(duration.router, prefix="/api")
 app.include_router(manpower.router, prefix="/api")
 app.include_router(diversion.router, prefix="/api")
 app.include_router(analytics.router, prefix="/api")
+app.include_router(traffic_router.router, prefix="/api")  # 2.0: live traffic + weather
+
+# Track background tasks so we can cancel them cleanly on shutdown
+_background_tasks: list = []
 
 
 # ── Startup ────────────────────────────────────────────────────────────────────
@@ -79,23 +85,74 @@ async def startup_event():
     logger.info("API ready at http://localhost:8000")
     logger.info("Docs at http://localhost:8000/docs")
 
-    # 3. Start TomTom Live Streamer Background Task
+    # 3. Start background collector tasks
     import asyncio
     from app.services.tomtom import sync_tomtom_incidents
-    
+    from app.services.weather_collector import sync_weather
+    from app.services.traffic_collector import sync_traffic
+
+    # Shared latest weather context (updated by weather poller, read by traffic poller)
+    _weather_ctx: dict = {}
+
     async def tomtom_poller():
+        """Polls TomTom Incident API every 60s."""
         while True:
             db = SessionLocal()
             try:
                 await asyncio.to_thread(sync_tomtom_incidents, db)
             except Exception as e:
-                logger.error(f"TomTom polling error: {e}")
+                logger.error(f"TomTom incident polling error: {e}")
             finally:
                 db.close()
             await asyncio.sleep(60)
-            
-    asyncio.create_task(tomtom_poller())
-    logger.info("[OK] TomTom Live Service activated (Polling every 60s)")
+
+    async def weather_poller():
+        """Polls OpenWeather API every 15 minutes."""
+        await asyncio.sleep(5)  # slight delay after startup
+        while True:
+            db = SessionLocal()
+            try:
+                result = await asyncio.to_thread(sync_weather, db)
+                if result:
+                    _weather_ctx.update(result)
+                    logger.info(f"[Weather] Updated: {result.get('condition')} {result.get('temperature_c')}C")
+            except Exception as e:
+                logger.error(f"Weather polling error: {e}")
+            finally:
+                db.close()
+            await asyncio.sleep(900)  # 15 minutes
+
+    async def traffic_poller():
+        """Polls TomTom Flow API for corridor speeds every 10 minutes."""
+        await asyncio.sleep(10)  # wait for weather to run first
+        while True:
+            db = SessionLocal()
+            try:
+                await asyncio.to_thread(sync_traffic, db, _weather_ctx or None)
+                logger.info("[Traffic] Corridor congestion snapshots updated.")
+            except Exception as e:
+                logger.error(f"Traffic polling error: {e}")
+            finally:
+                db.close()
+            await asyncio.sleep(600)  # 10 minutes
+
+    _background_tasks.append(asyncio.create_task(tomtom_poller()))
+    _background_tasks.append(asyncio.create_task(weather_poller()))
+    _background_tasks.append(asyncio.create_task(traffic_poller()))
+    logger.info("[OK] Background collectors active: TomTom Incidents (60s), Weather (15min), Traffic Flow (10min)")
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cancel all background pollers cleanly to prevent exit-code-1 crashes."""
+    import asyncio
+    for task in _background_tasks:
+        if not task.done():
+            task.cancel()
+    if _background_tasks:
+        import asyncio
+        await asyncio.gather(*_background_tasks, return_exceptions=True)
+    logger.info("[OK] BengaluruOps 2.0 background tasks stopped cleanly.")
 
 
 def _seed_database():

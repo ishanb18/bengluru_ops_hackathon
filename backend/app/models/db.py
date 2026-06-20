@@ -96,3 +96,49 @@ def get_db():
 def create_tables():
     """Create all tables."""
     Base.metadata.create_all(bind=engine)
+
+
+# ── BengaluruOps 2.0 Models ───────────────────────────────────────────────────
+
+class TrafficSnapshot(Base):
+    """Real-time corridor speed/congestion captured from TomTom Flow API."""
+    __tablename__ = "traffic_snapshots"
+
+    id = Column(Integer, primary_key=True, index=True)
+    timestamp = Column(DateTime, nullable=False, index=True)
+    corridor = Column(String(100), nullable=False, index=True)
+
+    # Speed data (km/h)
+    current_speed = Column(Float, nullable=True)
+    free_flow_speed = Column(Float, nullable=True)
+
+    # Derived
+    congestion_percent = Column(Float, nullable=True)   # 0–100
+    confidence = Column(Float, nullable=True)            # TomTom confidence score
+
+    # Context at time of snapshot
+    weather_condition = Column(String(50), nullable=True)
+    rainfall_mm = Column(Float, nullable=True, default=0.0)
+    incident_count = Column(Integer, nullable=True, default=0)
+
+    # ML predictions stored alongside snapshot
+    risk_30min = Column(String(10), nullable=True)   # Low / Medium / High
+    risk_60min = Column(String(10), nullable=True)
+
+
+class WeatherRecord(Base):
+    """Bengaluru weather snapshot from OpenWeather API."""
+    __tablename__ = "weather_data"
+
+    id = Column(Integer, primary_key=True, index=True)
+    timestamp = Column(DateTime, nullable=False, index=True)
+
+    temperature_c = Column(Float, nullable=True)
+    feels_like_c = Column(Float, nullable=True)
+    humidity_pct = Column(Integer, nullable=True)
+    rainfall_mm = Column(Float, nullable=True, default=0.0)   # last 1hr
+    visibility_m = Column(Integer, nullable=True)
+    wind_speed_kmh = Column(Float, nullable=True)
+    condition = Column(String(50), nullable=True)             # Clear / Rain / etc.
+    condition_detail = Column(String(100), nullable=True)     # full description
+
