@@ -507,3 +507,39 @@ tr:last-child td { border-bottom: none; }
   to { opacity: 1; transform: translateY(0); }
 }
 .metric-val { animation: countUp 0.4s ease-out; }
+
+/* ── CCTV MODAL ── */
+.cctv-overlay {
+  position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+  background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 9999; animation: fadeIn 0.2s ease-out;
+}
+.cctv-modal {
+  background: #111; border: 2px solid #333; border-radius: 12px;
+  width: 90vw; max-width: 700px; overflow: hidden;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.05);
+}
+.cctv-header {
+  background: #222; padding: 12px 16px;
+  display: flex; justify-content: space-between; align-items: center;
+  border-bottom: 1px solid #444; font-family: monospace; color: #fff;
+}
+.cctv-cam-name { font-size: 14px; font-weight: 700; letter-spacing: 1px; display: flex; align-items: center; gap: 8px;}
+.cctv-rec { width: 10px; height: 10px; background: red; border-radius: 50%; animation: pulse 1.5s infinite; }
+.cctv-close { background: transparent; border: none; color: #999; cursor: pointer; font-size: 20px; transition: color 0.2s; }
+.cctv-close:hover { color: #fff; }
+.cctv-feed-container {
+  position: relative; width: 100%; aspect-ratio: 16/9;
+  background: #000; display: flex; align-items: center; justify-content: center;
+}
+.cctv-feed-container img, .cctv-feed-container video { width: 100%; height: 100%; object-fit: cover; filter: contrast(1.1) brightness(0.9) grayscale(0.2); }
+.cctv-scanline {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+  background-size: 100% 4px, 6px 100%; pointer-events: none; z-index: 2;
+}
+.cctv-timestamp {
+  position: absolute; bottom: 16px; right: 16px;
+  color: #fff; font-family: monospace; font-size: 14px; text-shadow: 1px 1px 2px #000; z-index: 3;
+}

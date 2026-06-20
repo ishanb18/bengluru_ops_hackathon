@@ -21,6 +21,12 @@ const RISK_ICON = { Low: "🟢", Medium: "🟡", High: "🔴", Unknown: "⚪" };
 
 const PRIORITY_FILTERS = ["All", "High", "Low"];
 
+const CCTV_VIDEOS = [
+  "/215258_medium.mp4",
+  "/istockphoto-1131595282-640_adpp_is.mp4",
+  "/istockphoto-1162603138-640_adpp_is.mp4",
+];
+
 export default function LiveMap({ events, onRunAI, onScanComplete, addToast }) {
   // Map refs
   const mapContainerRef = useRef(null);
@@ -37,6 +43,7 @@ export default function LiveMap({ events, onRunAI, onScanComplete, addToast }) {
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("All");
+  const [cctvData, setCctvData] = useState(null);
 
   // Filtered events
   const filteredEvents = useMemo(() => {
@@ -134,7 +141,27 @@ export default function LiveMap({ events, onRunAI, onScanComplete, addToast }) {
         onRunAI(e.id);
       };
 
+      const cctvBtn = document.createElement("button");
+      cctvBtn.className = "btn";
+      cctvBtn.style.width = "100%";
+      cctvBtn.style.fontSize = "10px";
+      cctvBtn.style.padding = "6px";
+      cctvBtn.style.justifyContent = "center";
+      cctvBtn.style.height = "auto";
+      cctvBtn.style.marginTop = "6px";
+      cctvBtn.style.background = "var(--bg)";
+      cctvBtn.style.color = "var(--text-secondary)";
+      cctvBtn.style.border = "1px solid var(--border)";
+      cctvBtn.textContent = "📹 View Live Camera";
+      cctvBtn.onmouseover = () => { cctvBtn.style.background = "var(--card-bg)"; cctvBtn.style.color = "var(--text-primary)"; };
+      cctvBtn.onmouseout = () => { cctvBtn.style.background = "var(--bg)"; cctvBtn.style.color = "var(--text-secondary)"; };
+      cctvBtn.onclick = () => {
+        const randomVid = CCTV_VIDEOS[Math.floor(Math.random() * CCTV_VIDEOS.length)];
+        setCctvData({ corridor: e.corridor || "Bengaluru Traffic", videoUrl: randomVid });
+      };
+
       container.appendChild(actionBtn);
+      container.appendChild(cctvBtn);
 
       marker.bindPopup(container);
       markersRef.current.addLayer(marker);
@@ -250,11 +277,16 @@ export default function LiveMap({ events, onRunAI, onScanComplete, addToast }) {
           <div className="map-container" style={{ height: "450px" }}>
             <div ref={mapContainerRef} style={{ width: "100%", height: "100%" }} />
           </div>
-          <div style={{ marginTop: "10px", display: "flex", gap: "8px" }}>
-            <button className="btn btn-ghost" onClick={() => focusIncident(12.9716, 77.5946)}>📍 Recenter Bengaluru</button>
-            <span style={{ fontSize: "11px", color: "var(--text-tertiary)", alignSelf: "center" }}>
-              Showing {filteredEvents.length} of {events.length} incidents
-            </span>
+          <div style={{ marginTop: "10px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button className="btn btn-ghost" onClick={() => focusIncident(12.9716, 77.5946)}>📍 Recenter Bengaluru</button>
+              <span style={{ fontSize: "11px", color: "var(--text-tertiary)", alignSelf: "center" }}>
+                Showing {filteredEvents.length} of {events.length} incidents
+              </span>
+            </div>
+            <div style={{ fontSize: "11px", color: "var(--amber)", fontWeight: "600", display: "flex", alignItems: "center", gap: "6px", background: "rgba(245, 158, 11, 0.1)", padding: "4px 10px", borderRadius: "99px", border: "1px solid rgba(245, 158, 11, 0.3)" }}>
+              <span style={{ fontSize: "14px" }}>💡</span> Click any map marker to view its Live Camera feed
+            </div>
           </div>
         </div>
 
@@ -398,6 +430,28 @@ export default function LiveMap({ events, onRunAI, onScanComplete, addToast }) {
         )}
       </div>
 
+      {/* CCTV Modal */}
+      {cctvData && (
+        <div className="cctv-overlay" onClick={() => setCctvData(null)}>
+          <div className="cctv-modal" onClick={e => e.stopPropagation()}>
+            <div className="cctv-header">
+              <div className="cctv-cam-name">
+                <div className="cctv-rec"></div>
+                CAM: {cctvData.corridor.toUpperCase()}
+              </div>
+              <button className="cctv-close" onClick={() => setCctvData(null)}>✖</button>
+            </div>
+            <div className="cctv-feed-container">
+              <video src={cctvData.videoUrl} autoPlay loop muted playsInline />
+              <div className="cctv-scanline"></div>
+              <div style={{ position: "absolute", top: "16px", left: "16px", backgroundColor: "rgba(220, 38, 38, 0.8)", color: "white", padding: "4px 8px", fontSize: "10px", fontWeight: "bold", borderRadius: "4px", letterSpacing: "1px", zIndex: 4, backdropFilter: "blur(4px)", border: "1px solid rgba(255,255,255,0.3)" }}>
+                ⚠️ SIMULATED DEMO FEED
+              </div>
+              <div className="cctv-timestamp">LIVE - {new Date().toLocaleTimeString("en-IN")}</div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
