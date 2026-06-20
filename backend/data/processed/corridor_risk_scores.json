@@ -1,0 +1,491 @@
+{
+  "generated_at": "2026-06-20T03:24:50.926971",
+  "total_incidents": 8173,
+  "corridor_risk": [
+    {
+      "rank": 1,
+      "corridor": "Non-corridor",
+      "risk_score": 64.3,
+      "risk_tier": "High",
+      "incident_count": 3144,
+      "pct_high_priority": 0.22264631043256997,
+      "pct_road_closures": 12.022900763358779,
+      "avg_duration_hours": 138.6727126103783,
+      "event_cause_top": "vehicle_breakdown"
+    },
+    {
+      "rank": 2,
+      "corridor": "Mysore Road",
+      "risk_score": 58.2,
+      "risk_tier": "High",
+      "incident_count": 743,
+      "pct_high_priority": 99.7308209959623,
+      "pct_road_closures": 11.036339165545089,
+      "avg_duration_hours": 49.280021878210235,
+      "event_cause_top": "vehicle_breakdown"
+    },
+    {
+      "rank": 3,
+      "corridor": "CBD 1",
+      "risk_score": 58.1,
+      "risk_tier": "High",
+      "incident_count": 26,
+      "pct_high_priority": 100.0,
+      "pct_road_closures": 11.538461538461538,
+      "avg_duration_hours": 264.7771037822222,
+      "event_cause_top": "pot_holes"
+    },
+    {
+      "rank": 4,
+      "corridor": "Airport New South Road",
+      "risk_score": 54.1,
+      "risk_tier": "High",
+      "incident_count": 67,
+      "pct_high_priority": 100.0,
+      "pct_road_closures": 10.44776119402985,
+      "avg_duration_hours": 200.66457705678238,
+      "event_cause_top": "vehicle_breakdown"
+    },
+    {
+      "rank": 5,
+      "corridor": "Varthur Road",
+      "risk_score": 51.1,
+      "risk_tier": "High",
+      "incident_count": 77,
+      "pct_high_priority": 100.0,
+      "pct_road_closures": 11.688311688311687,
+      "avg_duration_hours": 52.11974688532679,
+      "event_cause_top": "vehicle_breakdown"
+    },
+    {
+      "rank": 6,
+      "corridor": "CBD 2",
+      "risk_score": 50.8,
+      "risk_tier": "High",
+      "incident_count": 104,
+      "pct_high_priority": 100.0,
+      "pct_road_closures": 6.730769230769231,
+      "avg_duration_hours": 291.58255390748104,
+      "event_cause_top": "vehicle_breakdown"
+    },
+    {
+      "rank": 7,
+      "corridor": "ORR East 1",
+      "risk_score": 48.2,
+      "risk_tier": "High",
+      "incident_count": 244,
+      "pct_high_priority": 100.0,
+      "pct_road_closures": 7.377049180327869,
+      "avg_duration_hours": 138.72571971028373,
+      "event_cause_top": "vehicle_breakdown"
+    },
+    {
+      "rank": 8,
+      "corridor": "ORR North 1",
+      "risk_score": 48.1,
+      "risk_tier": "High",
+      "incident_count": 275,
+      "pct_high_priority": 100.0,
+      "pct_road_closures": 8.0,
+      "avg_duration_hours": 94.11860786193152,
+      "event_cause_top": "vehicle_breakdown"
+    },
+    {
+      "rank": 9,
+      "corridor": "Bellary Road 1",
+      "risk_score": 46.7,
+      "risk_tier": "High",
+      "incident_count": 610,
+      "pct_high_priority": 100.0,
+      "pct_road_closures": 5.409836065573771,
+      "avg_duration_hours": 73.95182350421913,
+      "event_cause_top": "vehicle_breakdown"
+    },
+    {
+      "rank": 10,
+      "corridor": "Hosur Road",
+      "risk_score": 45.8,
+      "risk_tier": "High",
+      "incident_count": 298,
+      "pct_high_priority": 100.0,
+      "pct_road_closures": 5.704697986577181,
+      "avg_duration_hours": 143.37247270711393,
+      "event_cause_top": "vehicle_breakdown"
+    },
+    {
+      "rank": 11,
+      "corridor": "IRR(Thanisandra road)",
+      "risk_score": 45.4,
+      "risk_tier": "High",
+      "incident_count": 95,
+      "pct_high_priority": 100.0,
+      "pct_road_closures": 6.315789473684211,
+      "avg_duration_hours": 170.94690727699347,
+      "event_cause_top": "pot_holes"
+    },
+    {
+      "rank": 12,
+      "corridor": "Old Airport Road",
+      "risk_score": 44.9,
+      "risk_tier": "Medium",
+      "incident_count": 76,
+      "pct_high_priority": 100.0,
+      "pct_road_closures": 7.894736842105263,
+      "avg_duration_hours": 82.64912359677778,
+      "event_cause_top": "vehicle_breakdown"
+    },
+    {
+      "rank": 13,
+      "corridor": "West of Chord Road",
+      "risk_score": 43.2,
+      "risk_tier": "Medium",
+      "incident_count": 174,
+      "pct_high_priority": 100.0,
+      "pct_road_closures": 6.321839080459771,
+      "avg_duration_hours": 82.42579565842749,
+      "event_cause_top": "vehicle_breakdown"
+    },
+    {
+      "rank": 14,
+      "corridor": "Bannerghata Road",
+      "risk_score": 43.0,
+      "risk_tier": "Medium",
+      "incident_count": 209,
+      "pct_high_priority": 100.0,
+      "pct_road_closures": 3.349282296650718,
+      "avg_duration_hours": 219.90040469576513,
+      "event_cause_top": "vehicle_breakdown"
+    },
+    {
+      "rank": 15,
+      "corridor": "Hennur Main Road",
+      "risk_score": 43.0,
+      "risk_tier": "Medium",
+      "incident_count": 96,
+      "pct_high_priority": 100.0,
+      "pct_road_closures": 6.25,
+      "avg_duration_hours": 107.8862028974495,
+      "event_cause_top": "vehicle_breakdown"
+    },
+    {
+      "rank": 16,
+      "corridor": "Old Madras Road",
+      "risk_score": 41.7,
+      "risk_tier": "Medium",
+      "incident_count": 263,
+      "pct_high_priority": 100.0,
+      "pct_road_closures": 4.562737642585551,
+      "avg_duration_hours": 103.05550348684073,
+      "event_cause_top": "vehicle_breakdown"
+    },
+    {
+      "rank": 17,
+      "corridor": "ORR North 2",
+      "risk_score": 39.7,
+      "risk_tier": "Medium",
+      "incident_count": 235,
+      "pct_high_priority": 100.0,
+      "pct_road_closures": 4.25531914893617,
+      "avg_duration_hours": 75.40653006143108,
+      "event_cause_top": "vehicle_breakdown"
+    },
+    {
+      "rank": 18,
+      "corridor": "Magadi Road",
+      "risk_score": 38.9,
+      "risk_tier": "Medium",
+      "incident_count": 245,
+      "pct_high_priority": 100.0,
+      "pct_road_closures": 4.081632653061225,
+      "avg_duration_hours": 58.446880506093905,
+      "event_cause_top": "vehicle_breakdown"
+    },
+    {
+      "rank": 19,
+      "corridor": "Bellary Road 2",
+      "risk_score": 38.8,
+      "risk_tier": "Medium",
+      "incident_count": 379,
+      "pct_high_priority": 100.0,
+      "pct_road_closures": 3.16622691292876,
+      "avg_duration_hours": 57.47096031328571,
+      "event_cause_top": "vehicle_breakdown"
+    },
+    {
+      "rank": 20,
+      "corridor": "ORR West 1",
+      "risk_score": 37.8,
+      "risk_tier": "Medium",
+      "incident_count": 168,
+      "pct_high_priority": 100.0,
+      "pct_road_closures": 2.976190476190476,
+      "avg_duration_hours": 111.90594936530626,
+      "event_cause_top": "vehicle_breakdown"
+    },
+    {
+      "rank": 21,
+      "corridor": "Tumkur Road",
+      "risk_score": 37.2,
+      "risk_tier": "Medium",
+      "incident_count": 458,
+      "pct_high_priority": 99.12663755458514,
+      "pct_road_closures": 2.6200873362445414,
+      "avg_duration_hours": 23.38601834930556,
+      "event_cause_top": "vehicle_breakdown"
+    },
+    {
+      "rank": 22,
+      "corridor": "ORR East 2",
+      "risk_score": 33.4,
+      "risk_tier": "Medium",
+      "incident_count": 187,
+      "pct_high_priority": 100.0,
+      "pct_road_closures": 1.6042780748663104,
+      "avg_duration_hours": 58.91958590118234,
+      "event_cause_top": "construction"
+    }
+  ],
+  "peak_hours_by_zone": {
+    "Central Zone 1": {
+      "peak_hour": 19,
+      "peak_hour_label": "19:00 \u2013 21:00",
+      "incident_count": 30
+    },
+    "Central Zone 2": {
+      "peak_hour": 22,
+      "peak_hour_label": "22:00 \u2013 00:00",
+      "incident_count": 67
+    },
+    "East Zone 1": {
+      "peak_hour": 21,
+      "peak_hour_label": "21:00 \u2013 23:00",
+      "incident_count": 56
+    },
+    "East Zone 2": {
+      "peak_hour": 20,
+      "peak_hour_label": "20:00 \u2013 22:00",
+      "incident_count": 25
+    },
+    "North Zone 1": {
+      "peak_hour": 20,
+      "peak_hour_label": "20:00 \u2013 22:00",
+      "incident_count": 32
+    },
+    "North Zone 2": {
+      "peak_hour": 20,
+      "peak_hour_label": "20:00 \u2013 22:00",
+      "incident_count": 52
+    },
+    "South Zone 1": {
+      "peak_hour": 23,
+      "peak_hour_label": "23:00 \u2013 01:00",
+      "incident_count": 62
+    },
+    "South Zone 2": {
+      "peak_hour": 5,
+      "peak_hour_label": "05:00 \u2013 07:00",
+      "incident_count": 51
+    },
+    "Unknown": {
+      "peak_hour": 6,
+      "peak_hour_label": "06:00 \u2013 08:00",
+      "incident_count": 443
+    },
+    "West Zone 1": {
+      "peak_hour": 21,
+      "peak_hour_label": "21:00 \u2013 23:00",
+      "incident_count": 50
+    },
+    "West Zone 2": {
+      "peak_hour": 21,
+      "peak_hour_label": "21:00 \u2013 23:00",
+      "incident_count": 35
+    }
+  },
+  "top_junctions": [
+    {
+      "junction": "MekhriCircle",
+      "incident_count": 64
+    },
+    {
+      "junction": "AyyappaTempleJunc",
+      "incident_count": 49
+    },
+    {
+      "junction": "SatteliteBusStandJunc",
+      "incident_count": 43
+    },
+    {
+      "junction": "YeshwanthpuraCircle",
+      "incident_count": 38
+    },
+    {
+      "junction": "YelhankaCircle",
+      "incident_count": 34
+    },
+    {
+      "junction": "SilkBoardJunc",
+      "incident_count": 33
+    },
+    {
+      "junction": "toll gate mysore road",
+      "incident_count": 33
+    },
+    {
+      "junction": "Nagavara-ORR Junction",
+      "incident_count": 32
+    },
+    {
+      "junction": "JalahalliCross(SM Circle)",
+      "incident_count": 32
+    },
+    {
+      "junction": "K R Circle",
+      "incident_count": 31
+    }
+  ],
+  "monthly_trend": [
+    {
+      "month": "2023-11",
+      "incident_count": 984
+    },
+    {
+      "month": "2023-12",
+      "incident_count": 1774
+    },
+    {
+      "month": "2024-01",
+      "incident_count": 1468
+    },
+    {
+      "month": "2024-02",
+      "incident_count": 1361
+    },
+    {
+      "month": "2024-03",
+      "incident_count": 1958
+    },
+    {
+      "month": "2024-04",
+      "incident_count": 628
+    }
+  ],
+  "cause_breakdown": [
+    {
+      "event_cause": "vehicle_breakdown",
+      "incident_count": 4896,
+      "avg_duration_min": 58.1,
+      "pct_high_priority": 66.2
+    },
+    {
+      "event_cause": "others",
+      "incident_count": 671,
+      "avg_duration_min": 13177.4,
+      "pct_high_priority": 59.2
+    },
+    {
+      "event_cause": "pot_holes",
+      "incident_count": 537,
+      "avg_duration_min": 35516.9,
+      "pct_high_priority": 55.7
+    },
+    {
+      "event_cause": "construction",
+      "incident_count": 480,
+      "avg_duration_min": 13476.0,
+      "pct_high_priority": 62.9
+    },
+    {
+      "event_cause": "water_logging",
+      "incident_count": 458,
+      "avg_duration_min": 12296.6,
+      "pct_high_priority": 59.2
+    },
+    {
+      "event_cause": "accident",
+      "incident_count": 365,
+      "avg_duration_min": 47.9,
+      "pct_high_priority": 46.0
+    },
+    {
+      "event_cause": "tree_fall",
+      "incident_count": 284,
+      "avg_duration_min": 6160.9,
+      "pct_high_priority": 32.7
+    },
+    {
+      "event_cause": "road_conditions",
+      "incident_count": 170,
+      "avg_duration_min": 25888.2,
+      "pct_high_priority": 54.7
+    },
+    {
+      "event_cause": "congestion",
+      "incident_count": 136,
+      "avg_duration_min": 74.7,
+      "pct_high_priority": 69.1
+    },
+    {
+      "event_cause": "public_event",
+      "incident_count": 84,
+      "avg_duration_min": NaN,
+      "pct_high_priority": 50.0
+    },
+    {
+      "event_cause": "procession",
+      "incident_count": 72,
+      "avg_duration_min": 54.5,
+      "pct_high_priority": 31.9
+    },
+    {
+      "event_cause": "vip_movement",
+      "incident_count": 20,
+      "avg_duration_min": NaN,
+      "pct_high_priority": 35.0
+    }
+  ],
+  "corridor_diversions": {
+    "Mysore Road": [
+      "Magadi Road",
+      "NICE Expressway"
+    ],
+    "Bellary Road 1": [
+      "Bellary Road 2",
+      "Hebbal Flyover"
+    ],
+    "Tumkur Road": [
+      "Magadi Road",
+      "NICE Expressway"
+    ],
+    "ORR East 1": [
+      "ORR East 2"
+    ],
+    "Hosur Road": [
+      "Bannerghata Road"
+    ],
+    "Old Madras Road": [
+      "KR Pura alternate"
+    ],
+    "Magadi Road": [
+      "Mysore Road",
+      "Chord Road"
+    ],
+    "Bellary Road 2": [
+      "Bellary Road 1",
+      "ORR North 1"
+    ],
+    "ORR North 1": [
+      "ORR North 2",
+      "Bellary Road 2"
+    ],
+    "ORR North 2": [
+      "ORR North 1"
+    ],
+    "Bannerghata Road": [
+      "Hosur Road"
+    ],
+    "West of Chord Road": [
+      "Magadi Road"
+    ]
+  }
+}

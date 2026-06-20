@@ -1,0 +1,45 @@
+{
+  "bucket_classifier": {
+    "target": "Duration Bucket",
+    "accuracy": 0.7059,
+    "f1_weighted": 0.7207,
+    "bucket_distribution_train": {
+      "Fast": 1199,
+      "Medium": 228
+    },
+    "classification_report": {
+      "Fast": {
+        "precision": 0.8445229681978799,
+        "recall": 0.7966666666666666,
+        "f1-score": 0.8198970840480274,
+        "support": 300.0
+      },
+      "Medium": {
+        "precision": 0.17567567567567569,
+        "recall": 0.22807017543859648,
+        "f1-score": 0.1984732824427481,
+        "support": 57.0
+      },
+      "accuracy": 0.7058823529411765,
+      "macro avg": {
+        "precision": 0.5100993219367778,
+        "recall": 0.5123684210526316,
+        "f1-score": 0.5091851832453878,
+        "support": 357.0
+      },
+      "weighted avg": {
+        "precision": 0.7377322240136623,
+        "recall": 0.7058823529411765,
+        "f1-score": 0.7206781577413022,
+        "support": 357.0
+      }
+    }
+  },
+  "regression_model": {
+    "target": "Duration Minutes",
+    "mae_minutes": 29.1,
+    "r2_log_scale": 0.0022,
+    "training_rows": 1783,
+    "note": "Trained on log1p(duration_minutes), apply np.expm1() to predictions"
+  }
+}
