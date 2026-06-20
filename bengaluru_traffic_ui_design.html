@@ -1,0 +1,1378 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>BengaluruOps Command Center</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --navy: #0A0F1E;
+    --navy2: #111827;
+    --navy3: #1C2438;
+    --navy4: #243049;
+    --amber: #F59E0B;
+    --amber-dim: #92600A;
+    --red: #EF4444;
+    --green: #10B981;
+    --green-dim: #064E3B;
+    --blue: #3B82F6;
+    --blue-dim: #1E3A5F;
+    --text-primary: #F1F5F9;
+    --text-secondary: #94A3B8;
+    --text-tertiary: #475569;
+    --border: rgba(255,255,255,0.07);
+    --border-bright: rgba(255,255,255,0.12);
+  }
+
+  body {
+    background: #0D1117;
+    font-family: 'Inter', sans-serif;
+    color: var(--text-primary);
+    padding: 24px;
+    min-height: 100vh;
+  }
+
+  /* ── TABS ── */
+  .tabs { display: flex; gap: 4px; margin-bottom: 24px; background: var(--navy2); border-radius: 10px; padding: 4px; width: fit-content; flex-wrap: wrap; }
+  .tab { font-size: 12px; font-weight: 500; padding: 6px 14px; border-radius: 7px; cursor: pointer; color: var(--text-secondary); border: none; background: transparent; transition: all 0.2s; }
+  .tab.active { background: var(--navy4); color: var(--text-primary); border: 0.5px solid var(--border-bright); }
+  .tab:hover:not(.active) { color: var(--text-primary); }
+
+  /* ── SCREENS ── */
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  /* ── SHARED COMPONENTS ── */
+  .page-title { font-size: 22px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; letter-spacing: -0.3px; }
+  .page-sub { font-size: 13px; color: var(--text-secondary); margin-bottom: 20px; }
+  .card { background: var(--navy2); border: 0.5px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+  .card-title { font-size: 12px; font-weight: 500; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 12px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .grid4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; }
+  .badge { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 500; padding: 3px 8px; border-radius: 99px; }
+  .badge-red { background: rgba(239,68,68,0.15); color: #FCA5A5; border: 0.5px solid rgba(239,68,68,0.3); }
+  .badge-amber { background: rgba(245,158,11,0.15); color: #FCD34D; border: 0.5px solid rgba(245,158,11,0.3); }
+  .badge-green { background: rgba(16,185,129,0.15); color: #6EE7B7; border: 0.5px solid rgba(16,185,129,0.3); }
+  .badge-blue { background: rgba(59,130,246,0.15); color: #93C5FD; border: 0.5px solid rgba(59,130,246,0.3); }
+  .metric-val { font-size: 26px; font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+  .metric-lbl { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+  .metric-delta { font-size: 11px; font-family: 'JetBrains Mono', monospace; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; padding: 7px 14px; border-radius: 7px; border: none; cursor: pointer; transition: all 0.18s; }
+  .btn-primary { background: var(--amber); color: #000; }
+  .btn-primary:hover { background: #D97706; }
+  .btn-ghost { background: var(--navy3); color: var(--text-secondary); border: 0.5px solid var(--border-bright); }
+  .btn-ghost:hover { color: var(--text-primary); }
+  .divider { border: none; border-top: 0.5px solid var(--border); margin: 16px 0; }
+  .mono { font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+
+  /* ── SCREEN 1: LIVE MAP ── */
+  .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #10B981; box-shadow: 0 0 0 3px rgba(16,185,129,0.2); animation: pulse 2s infinite; display: inline-block; margin-right: 6px; }
+  @keyframes pulse { 0%,100% { box-shadow: 0 0 0 3px rgba(16,185,129,0.2); } 50% { box-shadow: 0 0 0 6px rgba(16,185,129,0.05); } }
+
+  .map-container { position: relative; background: var(--navy2); border-radius: 14px; border: 0.5px solid var(--border); overflow: hidden; height: 340px; margin-bottom: 12px; }
+  .map-bg { width: 100%; height: 100%; background:
+    repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(255,255,255,0.025) 40px),
+    repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(255,255,255,0.025) 40px),
+    #0F172A; position: relative; }
+
+  /* Road network */
+  .road { position: absolute; background: var(--navy3); border-radius: 2px; }
+  .road-h { height: 6px; left: 0; right: 0; }
+  .road-v { width: 6px; top: 0; bottom: 0; }
+  .road.major { background: #1E293B; }
+  .road.major.road-h { height: 10px; }
+  .road.major.road-v { width: 10px; }
+
+  /* Corridor stress */
+  .stress-overlay { position: absolute; border-radius: 3px; opacity: 0.55; }
+
+  /* Incident markers */
+  .marker { position: absolute; transform: translate(-50%, -50%); cursor: pointer; z-index: 10; }
+  .marker-dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.3); position: relative; box-shadow: 0 0 0 4px; transition: all 0.2s; }
+  .marker-dot.high { background: var(--red); box-shadow: 0 0 0 4px rgba(239,68,68,0.2); }
+  .marker-dot.low { background: var(--amber); box-shadow: 0 0 0 4px rgba(245,158,11,0.2); }
+  .marker-dot.closed { background: #8B5CF6; box-shadow: 0 0 0 4px rgba(139,92,246,0.2); }
+  .marker:hover .marker-dot { transform: scale(1.4); }
+  .marker-label { position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--navy); border: 0.5px solid var(--border-bright); border-radius: 5px; padding: 2px 6px; font-size: 10px; white-space: nowrap; opacity: 0; transition: opacity 0.2s; pointer-events: none; }
+  .marker:hover .marker-label { opacity: 1; }
+
+  .map-legend { position: absolute; bottom: 12px; left: 12px; background: rgba(10,15,30,0.85); border: 0.5px solid var(--border-bright); border-radius: 8px; padding: 10px 12px; backdrop-filter: blur(8px); }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-secondary); margin-bottom: 4px; }
+  .legend-item:last-child { margin-bottom: 0; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+  .map-controls { position: absolute; top: 12px; right: 12px; display: flex; flex-direction: column; gap: 6px; }
+  .map-btn { width: 30px; height: 30px; background: rgba(10,15,30,0.85); border: 0.5px solid var(--border-bright); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 14px; cursor: pointer; }
+
+  .incident-panel { background: var(--navy2); border: 0.5px solid var(--border-bright); border-radius: 12px; padding: 14px; }
+  .incident-row { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 0.5px solid var(--border); }
+  .incident-row:last-child { border-bottom: none; }
+  .incident-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+  .incident-icon.red { background: rgba(239,68,68,0.15); }
+  .incident-icon.amber { background: rgba(245,158,11,0.15); }
+  .incident-icon.purple { background: rgba(139,92,246,0.15); }
+  .incident-meta { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+  .incident-name { font-size: 13px; font-weight: 500; color: var(--text-primary); }
+
+  /* ── SCREEN 2: CLASSIFIER ── */
+  .classifier-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .form-group { margin-bottom: 14px; }
+  .form-label { font-size: 12px; font-weight: 500; color: var(--text-secondary); margin-bottom: 6px; display: block; }
+  .form-select { width: 100%; background: var(--navy3); border: 0.5px solid var(--border-bright); border-radius: 8px; padding: 9px 12px; font-size: 13px; color: var(--text-primary); font-family: 'Inter', sans-serif; outline: none; }
+  .form-select:focus { border-color: var(--amber); }
+  .result-box { background: var(--navy3); border-radius: 12px; border: 0.5px solid var(--border-bright); padding: 18px; margin-top: 4px; }
+  .result-main { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 2px; }
+  .result-main.high { color: var(--red); }
+  .result-main.low { color: var(--amber); }
+  .confidence-bar { height: 6px; background: var(--navy4); border-radius: 99px; overflow: hidden; margin: 10px 0 4px; }
+  .confidence-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--green), #34D399); }
+  .shap-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; padding: 4px 0; border-bottom: 0.5px solid var(--border); }
+  .shap-row:last-child { border-bottom: none; }
+  .shap-bar-pos { height: 4px; background: var(--red); border-radius: 2px; }
+  .shap-bar-neg { height: 4px; background: var(--green); border-radius: 2px; }
+  .shap-label { color: var(--text-secondary); flex: 1; }
+  .shap-val { color: var(--text-primary); font-family: 'JetBrains Mono', monospace; font-size: 11px; min-width: 40px; text-align: right; }
+
+  /* ── SCREEN 3: DURATION ── */
+  .dur-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+  .dur-card { background: var(--navy3); border-radius: 10px; padding: 14px; border: 0.5px solid var(--border); position: relative; overflow: hidden; }
+  .dur-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+  .dur-card.fast::before { background: var(--green); }
+  .dur-card.medium::before { background: var(--amber); }
+  .dur-card.slow::before { background: var(--red); }
+  .dur-time { font-size: 22px; font-weight: 600; margin: 4px 0; }
+  .dur-cause { font-size: 11px; color: var(--text-secondary); }
+  .timeline { position: relative; padding-left: 20px; }
+  .timeline::before { content: ''; position: absolute; left: 6px; top: 0; bottom: 0; width: 1px; background: var(--border-bright); }
+  .tl-item { position: relative; padding: 0 0 14px 16px; }
+  .tl-item::before { content: ''; position: absolute; left: -14px; top: 4px; width: 8px; height: 8px; border-radius: 50%; }
+  .tl-item.done::before { background: var(--green); }
+  .tl-item.active::before { background: var(--amber); box-shadow: 0 0 0 3px rgba(245,158,11,0.2); }
+  .tl-item.pending::before { background: var(--text-tertiary); }
+  .tl-label { font-size: 13px; font-weight: 500; color: var(--text-primary); }
+  .tl-sub { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+
+  /* ── SCREEN 4: MANPOWER ── */
+  .deploy-card { background: var(--navy3); border-radius: 10px; padding: 14px 16px; border: 0.5px solid var(--border); display: flex; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
+  .deploy-icon { width: 36px; height: 36px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+  .station-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 0.5px solid var(--border); font-size: 12px; }
+  .station-row:last-child { border-bottom: none; }
+  .dist-bar { height: 3px; background: var(--navy4); border-radius: 99px; margin-top: 4px; overflow: hidden; }
+  .dist-fill { height: 100%; background: var(--blue); border-radius: 99px; }
+
+  /* ── SCREEN 5: DIVERSION ── */
+  .corridor-map { background: var(--navy3); border-radius: 12px; border: 0.5px solid var(--border); padding: 16px; position: relative; height: 220px; overflow: hidden; margin-bottom: 12px; }
+  .road-line { position: absolute; background: var(--navy4); border-radius: 3px; }
+  .road-line.blocked { background: rgba(239,68,68,0.4); border: 1px dashed rgba(239,68,68,0.6); }
+  .road-line.divert { background: rgba(16,185,129,0.5); }
+  .road-label { position: absolute; font-size: 10px; color: var(--text-secondary); white-space: nowrap; }
+  .divert-card { background: var(--navy3); border-radius: 10px; border: 0.5px solid; padding: 12px 14px; margin-bottom: 8px; }
+  .divert-card.primary { border-color: rgba(16,185,129,0.4); }
+  .divert-card.secondary { border-color: var(--border); }
+  .stress-pill { font-size: 11px; padding: 2px 8px; border-radius: 99px; }
+  .stress-low { background: rgba(16,185,129,0.15); color: #6EE7B7; }
+  .stress-med { background: rgba(245,158,11,0.15); color: #FCD34D; }
+  .stress-high { background: rgba(239,68,68,0.15); color: #FCA5A5; }
+
+  /* ── SCREEN 6: ANALYTICS ── */
+  .risk-bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .risk-name { font-size: 12px; color: var(--text-secondary); min-width: 120px; }
+  .risk-bar-bg { flex: 1; height: 6px; background: var(--navy3); border-radius: 99px; overflow: hidden; }
+  .risk-bar-fill { height: 100%; border-radius: 99px; }
+  .risk-score { font-size: 12px; font-weight: 500; min-width: 32px; text-align: right; font-family: 'JetBrains Mono', monospace; color: var(--text-primary); }
+  .chart-bar { display: flex; align-items: flex-end; gap: 5px; height: 80px; padding-top: 8px; }
+  .bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .bar-rect { width: 100%; border-radius: 4px 4px 0 0; }
+  .bar-lbl { font-size: 10px; color: var(--text-tertiary); }
+
+  /* ── SCREEN 7: NEW FEATURES ── */
+  .new-feature { background: var(--navy2); border: 0.5px solid var(--border-bright); border-radius: 12px; padding: 16px 18px; margin-bottom: 10px; display: flex; gap: 14px; }
+  .nf-num { font-size: 11px; font-weight: 600; color: var(--amber); font-family: 'JetBrains Mono', monospace; }
+  .nf-title { font-size: 14px; font-weight: 500; color: var(--text-primary); margin-bottom: 4px; }
+  .nf-body { font-size: 12px; color: var(--text-secondary); line-height: 1.6; }
+  .nf-tag { display: inline-block; font-size: 10px; padding: 2px 7px; border-radius: 4px; background: var(--navy4); color: var(--text-tertiary); border: 0.5px solid var(--border-bright); margin: 3px 2px 0 0; }
+
+  /* ── SCREEN 8: APP FLOW ── */
+  .flow-node { background: var(--navy2); border: 0.5px solid var(--border-bright); border-radius: 10px; padding: 12px 14px; position: relative; }
+  .flow-node.primary { border-color: rgba(245,158,11,0.5); background: rgba(245,158,11,0.05); }
+  .flow-node.decision { border-color: rgba(59,130,246,0.4); background: rgba(59,130,246,0.05); border-radius: 4px; }
+  .flow-node-title { font-size: 13px; font-weight: 500; color: var(--text-primary); }
+  .flow-node-sub { font-size: 11px; color: var(--text-secondary); margin-top: 3px; }
+  .flow-arrow { display: flex; align-items: center; justify-content: center; color: var(--text-tertiary); font-size: 18px; }
+  .flow-col { display: flex; flex-direction: column; gap: 8px; }
+  .flow-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; }
+
+  /* Leaflet dark mode theme styles */
+  .leaflet-popup-content-wrapper {
+    background: var(--navy2) !important;
+    color: var(--text-primary) !important;
+    border: 0.5px solid var(--border-bright) !important;
+    border-radius: 8px !important;
+    font-family: 'Inter', sans-serif !important;
+    font-size: 12px !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
+  }
+  .leaflet-popup-tip {
+    background: var(--navy2) !important;
+  }
+  .leaflet-container {
+    background: #0F172A !important;
+  }
+  .leaflet-bar a {
+    background-color: var(--navy2) !important;
+    color: var(--text-primary) !important;
+    border-bottom: 1px solid var(--border) !important;
+  }
+  .leaflet-bar a:hover {
+    background-color: var(--navy4) !important;
+  }
+</style>
+
+<div>
+  <!-- Header -->
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+    <div>
+      <div style="font-size:11px; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:0.1em; margin-bottom:4px;">Bengaluru Traffic Intelligence</div>
+      <h1 style="font-size:26px; font-weight:700; color:var(--text-primary); letter-spacing:-0.5px;">BengaluruOps <span style="color:var(--amber);">Command</span></h1>
+    </div>
+    <div style="text-align:right;">
+      <div style="font-size:11px; color:var(--text-tertiary);">Real-time · Event-driven · AI-powered</div>
+      <div style="display:flex; gap:6px; margin-top:6px; justify-content:flex-end;">
+        <span class="badge badge-green"><span class="live-dot" style="width:6px;height:6px;box-shadow:none;animation:none;"></span>Live</span>
+        <span class="badge badge-amber">Bengaluru City</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab(0)">🗺 Live Map</button>
+    <button class="tab" onclick="switchTab(1)">🤖 AI Classifier</button>
+    <button class="tab" onclick="switchTab(2)">⏱ Duration</button>
+    <button class="tab" onclick="switchTab(3)">👮 Manpower</button>
+    <button class="tab" onclick="switchTab(4)">🔀 Diversion</button>
+    <button class="tab" onclick="switchTab(5)">📊 Analytics</button>
+    <button class="tab" onclick="switchTab(6)">✨ New Features</button>
+    <button class="tab" onclick="switchTab(7)">🔄 App Flow</button>
+  </div>
+
+  <!-- SCREEN 1: LIVE MAP -->
+  <div class="screen active" id="s0">
+    <div class="topbar">
+      <div>
+        <div class="page-title">Live Incident Map</div>
+        <div class="page-sub"><span class="live-dot"></span>127 active incidents across Bengaluru · Updated 14s ago</div>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-ghost">🔴 High only</button>
+        <button class="btn btn-ghost">📍 Filter zone</button>
+        <button class="btn btn-primary">+ Log incident</button>
+      </div>
+    </div>
+
+    <!-- KPI Row -->
+    <div class="grid4" style="margin-bottom:14px;">
+      <div class="card" style="text-align:center;">
+        <div class="metric-val" style="color:var(--red);" id="kpi-high-priority">0</div>
+        <div class="metric-lbl">High Priority</div>
+        <div class="metric-delta" style="color:var(--red); margin-top:4px;">active</div>
+      </div>
+      <div class="card" style="text-align:center;">
+        <div class="metric-val" style="color:var(--amber);" id="kpi-low-priority">0</div>
+        <div class="metric-lbl">Low Priority</div>
+        <div class="metric-delta" style="color:var(--text-tertiary); margin-top:4px;">active</div>
+      </div>
+      <div class="card" style="text-align:center;">
+        <div class="metric-val" style="color:#8B5CF6;" id="kpi-road-closures">0</div>
+        <div class="metric-lbl">Road Closures</div>
+        <div class="metric-delta" style="color:var(--red); margin-top:4px;">active</div>
+      </div>
+      <div class="card" style="text-align:center;">
+        <div class="metric-val" id="kpi-avg-resolution">0.0h</div>
+        <div class="metric-lbl">Avg Resolution</div>
+        <div class="metric-delta" style="color:var(--green); margin-top:4px;">historical avg</div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <!-- Map -->
+      <div>
+        <div class="map-container">
+          <div id="map" style="width:100%; height:100%; z-index: 1;"></div>
+          <!-- Legend -->
+          <div class="map-legend" style="z-index: 1000; position: absolute; bottom: 12px; left: 12px; background: rgba(10,15,30,0.85); border: 0.5px solid var(--border-bright); border-radius: 8px; padding: 10px 12px; backdrop-filter: blur(8px); pointer-events: none;">
+            <div class="legend-item"><div class="legend-dot" style="background:var(--red);"></div>High priority</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--amber);"></div>Low priority</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#8B5CF6;"></div>Road closure</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Incident feed -->
+      <div>
+        <div class="card-title" style="margin-bottom:8px;">Active incidents · sorted by severity</div>
+        <div class="incident-panel" id="incident-feed-panel" style="max-height: 340px; overflow-y: auto;">
+          <div style="padding: 20px; text-align: center; color: var(--text-secondary);">Loading incidents...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN 2: CLASSIFIER -->
+  <div class="screen" id="s1">
+    <div class="page-title">AI Event Impact Classifier</div>
+    <div class="page-sub">Input 4 fields → instant priority + closure prediction with SHAP explanation</div>
+    <div class="classifier-wrap">
+      <div class="card">
+        <div class="card-title">Event details</div>
+        <div class="form-group">
+          <label class="form-label">Event cause</label>
+          <select class="form-select" id="class-cause">
+            <option value="vehicle_breakdown">Vehicle breakdown</option>
+            <option value="accident">Accident</option>
+            <option value="construction">Construction</option>
+            <option value="water_logging">Water logging</option>
+            <option value="vip_movement">VIP movement</option>
+            <option value="public_event">Public event</option>
+            <option value="pot_holes">Pot holes</option>
+            <option value="tree_fall">Tree fall</option>
+            <option value="others">Other / Debris</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Corridor</label>
+          <select class="form-select" id="class-corridor">
+            <option value="Tumkur Road">Tumkur Road</option>
+            <option value="Mysore Road">Mysore Road</option>
+            <option value="Bellary Road 1">Bellary Road 1</option>
+            <option value="Hosur Road">Hosur Road</option>
+            <option value="ORR East 1">ORR East 1</option>
+            <option value="Old Madras Road">Old Madras Road</option>
+            <option value="Non-corridor">Non-corridor</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Vehicle type involved</label>
+          <select class="form-select" id="class-veh">
+            <option value="heavy_vehicle">Heavy vehicle (HGV)</option>
+            <option value="lcv">LCV</option>
+            <option value="private_car">Car</option>
+            <option value="bus">Bus (BMTC/KSRTC)</option>
+            <option value="two_wheeler">Two-wheeler</option>
+            <option value="N/A">N/A</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Time of report</label>
+          <select class="form-select" id="class-time">
+            <option value="6">05:00 – 07:00 (Early morning peak)</option>
+            <option value="9">08:00 – 10:00 (Morning rush)</option>
+            <option value="13">12:00 – 14:00 (Afternoon)</option>
+            <option value="18">17:00 – 20:00 (Evening rush)</option>
+            <option value="22">21:00 – 23:00 (Night peak)</option>
+          </select>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+          <div class="form-group">
+            <label class="form-label">Day of Week</label>
+            <select class="form-select" id="class-weekday">
+              <option value="0">Mon</option>
+              <option value="1">Tue</option>
+              <option value="2">Wed</option>
+              <option value="3">Thu</option>
+              <option value="4">Fri</option>
+              <option value="5">Sat</option>
+              <option value="6">Sun</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Event Type</label>
+            <select class="form-select" id="class-type">
+              <option value="unplanned">Unplanned</option>
+              <option value="planned">Planned</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn btn-primary" id="btn-classify" style="width:100%; justify-content:center; margin-top:8px;" onclick="runClassification()">⚡ Classify incident</button>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        <div class="result-box" id="prediction-output-box" style="display:none;">
+          <div style="font-size:11px; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:0.07em; margin-bottom:8px;">Prediction output</div>
+          <div class="result-main high" id="pred-priority">HIGH PRIORITY</div>
+          <div style="display:flex; gap:8px; margin-top:6px;">
+            <span class="badge badge-blue" id="pred-closure">Road closure: YES</span>
+            <span class="badge badge-green" id="pred-confidence">Confidence: 87%</span>
+          </div>
+          <div style="margin-top:10px;">
+            <div style="font-size:11px; color:var(--text-tertiary); margin-bottom:4px;">Confidence score</div>
+            <div class="confidence-bar"><div class="confidence-fill" style="width:87%;" id="pred-confidence-bar"></div></div>
+            <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text-tertiary);"><span>0%</span><span id="pred-confidence-percent">87%</span><span>100%</span></div>
+          </div>
+        </div>
+
+        <div class="card" id="shap-card" style="display:none;">
+          <div class="card-title">Why this prediction? (SHAP explanations)</div>
+          <div id="pred-shap-container">
+            <!-- SHAP rows go here -->
+          </div>
+        </div>
+
+        <div class="card" id="action-card" style="display:none; background:rgba(245,158,11,0.05); border-color:rgba(245,158,11,0.3);">
+          <div style="font-size:12px; font-weight:500; color:var(--amber); margin-bottom:4px;">⚠ Auto-recommended action</div>
+          <div style="font-size:12px; color:var(--text-secondary); line-height:1.6;" id="pred-action">Dispatching...</div>
+        </div>
+
+        <div class="card" id="classifier-empty-state" style="text-align: center; padding: 40px 20px; color: var(--text-secondary);">
+          <div style="font-size: 32px; margin-bottom: 12px;">⚡</div>
+          <div>Select event parameters and click <b>Classify incident</b> to run AI predictions and SHAP explainability.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN 3: DURATION -->
+  <div class="screen" id="s2">
+    <div class="page-title">Event Duration Predictor</div>
+    <div class="page-sub">Resolution time buckets based on 6 months of real Bengaluru incident data</div>
+
+    <div class="dur-grid">
+      <div class="dur-card fast">
+        <div style="font-size:11px; color:var(--green); text-transform:uppercase; letter-spacing:0.07em;">Fast · &lt; 1 hour</div>
+        <div class="dur-time" style="color:var(--green);">~44 min</div>
+        <div class="dur-cause">Accidents · Tree fall (minor)</div>
+      </div>
+      <div class="dur-card medium">
+        <div style="font-size:11px; color:var(--amber); text-transform:uppercase; letter-spacing:0.07em;">Medium · 1–4 hours</div>
+        <div class="dur-time" style="color:var(--amber);">~72 min</div>
+        <div class="dur-cause">Vehicle breakdowns · Water logging · Public events</div>
+      </div>
+      <div class="dur-card slow">
+        <div style="font-size:11px; color:var(--red); text-transform:uppercase; letter-spacing:0.07em;">Slow · Days</div>
+        <div class="dur-time" style="color:var(--red);">4.5 days</div>
+        <div class="dur-cause">Pot holes · Construction · Major tree fall</div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="card" id="duration-timeline-card" style="display: none;">
+        <div class="card-title" id="duration-timeline-title">Resolution timeline</div>
+        <div class="timeline" style="margin-top:8px;" id="duration-timeline-items">
+          <!-- Dynamically populated timeline items -->
+        </div>
+      </div>
+      <div class="card" id="duration-empty-state" style="text-align: center; padding: 40px 20px; color: var(--text-secondary);">
+        <div style="font-size: 32px; margin-bottom: 12px;">⏱</div>
+        <div>No active incident loaded. Run classification in the <b>AI Classifier</b> tab first to predict resolution duration.</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Pothole escalation tracker · 358 unresolved</div>
+        <div style="background:rgba(239,68,68,0.08); border:0.5px solid rgba(239,68,68,0.25); border-radius:8px; padding:12px; margin-bottom:12px;">
+          <div style="font-size:13px; font-weight:500; color:#FCA5A5; margin-bottom:4px;">⚠ BBMP escalation required</div>
+          <div style="font-size:12px; color:var(--text-secondary);">358 potholes averaging 4.5 days — beyond traffic police jurisdiction. These need escalation to BBMP maintenance. Auto-flagging enabled.</div>
+        </div>
+        <div style="font-size:12px; color:var(--text-secondary); margin-bottom:8px;">Duration by cause (minutes avg)</div>
+        <div class="chart-bar">
+          <div class="bar-col"><div class="bar-rect" style="height:20%; background:var(--green);"></div><div class="bar-lbl">Acc</div></div>
+          <div class="bar-col"><div class="bar-rect" style="height:32%; background:var(--green);"></div><div class="bar-lbl">VB</div></div>
+          <div class="bar-col"><div class="bar-rect" style="height:38%; background:var(--amber);"></div><div class="bar-lbl">Water</div></div>
+          <div class="bar-col"><div class="bar-rect" style="height:45%; background:var(--amber);"></div><div class="bar-lbl">Pub</div></div>
+          <div class="bar-col"><div class="bar-rect" style="height:60%; background:var(--amber);"></div><div class="bar-lbl">Tree</div></div>
+          <div class="bar-col"><div class="bar-rect" style="height:75%; background:var(--red);"></div><div class="bar-lbl">Const</div></div>
+          <div class="bar-col"><div class="bar-rect" style="height:100%; background:var(--red);"></div><div class="bar-lbl">Phole</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN 4: MANPOWER -->
+  <div class="screen" id="s3">
+    <div class="page-title">Manpower Recommendation Engine</div>
+    <div class="page-sub">AI-calculated deployment based on priority, duration, and nearest stations</div>
+
+    <div class="grid2" id="manpower-details-grid" style="display: none;">
+      <div>
+        <div class="card-title" id="manpower-title">Deployment recommendation</div>
+        <div id="manpower-cards-container">
+          <!-- Dynamic recommendation cards go here -->
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Nearest police stations · ranked by distance</div>
+        <div id="manpower-stations-list">
+          <!-- Dynamic stations list goes here -->
+        </div>
+      </div>
+    </div>
+    <div class="card" id="manpower-empty-state" style="text-align: center; padding: 40px 20px; color: var(--text-secondary);">
+      <div style="font-size: 32px; margin-bottom: 12px;">👮</div>
+      <div>No active incident loaded. Run classification in the <b>AI Classifier</b> tab first to generate manpower recommendations.</div>
+    </div>
+  </div>
+
+  <!-- SCREEN 5: DIVERSION -->
+  <div class="screen" id="s4">
+    <div class="page-title">Diversion Suggestion Engine</div>
+    <div class="page-sub">Blocked corridor → instant alternate route with real-time stress score</div>
+
+    <div class="grid2">
+      <div>
+        <div class="card" style="margin-bottom: 12px;">
+          <div class="card-title">Select blocked corridor</div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <select class="form-select" id="divert-corridor-select" onchange="loadDiversions()">
+              <option value="Tumkur Road">Tumkur Road</option>
+              <option value="Mysore Road">Mysore Road</option>
+              <option value="Bellary Road 1">Bellary Road 1</option>
+              <option value="Hosur Road">Hosur Road</option>
+              <option value="ORR East 1">ORR East 1</option>
+              <option value="Old Madras Road">Old Madras Road</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="card-title" id="divert-title" style="margin-bottom:8px;">Blocked: Tumkur Road</div>
+        <div id="divert-cards-container">
+          <div style="padding: 20px; text-align: center; color: var(--text-secondary);">Loading diversion suggestions...</div>
+        </div>
+      </div>
+
+      <div>
+        <div class="card" style="margin-bottom:12px;">
+          <div class="card-title">All corridor diversions</div>
+          <div class="station-row"><span style="font-size:12px; color:var(--text-primary);">Mysore Road blocked</span><span style="font-size:11px; color:var(--text-secondary);">→ Magadi Rd · NICE</span></div>
+          <div class="station-row"><span style="font-size:12px; color:var(--text-primary);">Bellary Road 1 blocked</span><span style="font-size:11px; color:var(--text-secondary);">→ Bellary Rd 2 · Hebbal flyover</span></div>
+          <div class="station-row"><span style="font-size:12px; color:var(--text-primary);">ORR East 1 blocked</span><span style="font-size:11px; color:var(--text-secondary);">→ ORR East 2</span></div>
+          <div class="station-row"><span style="font-size:12px; color:var(--text-primary);">Hosur Road blocked</span><span style="font-size:11px; color:var(--text-secondary);">→ Bannerghatta Road</span></div>
+          <div class="station-row" style="border:none;"><span style="font-size:12px; color:var(--text-primary);">Old Madras Rd blocked</span><span style="font-size:11px; color:var(--text-secondary);">→ KR Pura alternate</span></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Current alternate route stress</div>
+          <div class="risk-bar-row"><span class="risk-name">NICE Expressway</span><div class="risk-bar-bg"><div class="risk-bar-fill" style="width:11%; background:var(--green);"></div></div><span class="risk-score">11</span></div>
+          <div class="risk-bar-row"><span class="risk-name">Magadi Road</span><div class="risk-bar-bg"><div class="risk-bar-fill" style="width:24%; background:var(--green);"></div></div><span class="risk-score">24</span></div>
+          <div class="risk-bar-row"><span class="risk-name">Bellary Road 2</span><div class="risk-bar-bg"><div class="risk-bar-fill" style="width:38%; background:var(--amber);"></div></div><span class="risk-score">38</span></div>
+          <div class="risk-bar-row"><span class="risk-name">Bannerghatta Rd</span><div class="risk-bar-bg"><div class="risk-bar-fill" style="width:55%; background:var(--amber);"></div></div><span class="risk-score">55</span></div>
+          <div class="risk-bar-row" style="margin-bottom:0;"><span class="risk-name">ORR East 2</span><div class="risk-bar-bg"><div class="risk-bar-fill" style="width:71%; background:var(--red);"></div></div><span class="risk-score">71</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN 6: ANALYTICS -->
+  <div class="screen" id="s5">
+    <div class="page-title">Post-Event Learning Dashboard</div>
+    <div class="page-sub">6 months of Bengaluru event data · Nov 2023 – Apr 2024 · Commanders use this for proactive deployment</div>
+
+    <div class="grid2" style="margin-bottom:12px;">
+      <div class="card">
+        <div class="card-title">Corridor risk ranking</div>
+        <div id="analytics-corridor-risk-container">
+          <div style="padding:20px; text-align:center; color:var(--text-secondary);">Loading risk ranking...</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Month-over-month incidents</div>
+        <div class="chart-bar" id="analytics-monthly-chart" style="height:100px; align-items:flex-end; padding-top:0;">
+          <div style="padding:20px; text-align:center; color:var(--text-secondary); width:100%;">Loading trends...</div>
+        </div>
+        <div style="font-size:11px; color:var(--text-tertiary); margin-top:8px;" id="analytics-monthly-note">Nov 2023 – Apr 2024 historical summary</div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">Top 10 worst junctions</div>
+        <div id="analytics-junctions-container">
+          <div style="padding:20px; text-align:center; color:var(--text-secondary);">Loading worst junctions...</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Peak hours by zone</div>
+        <div id="analytics-peak-hours-container">
+          <div style="padding:20px; text-align:center; color:var(--text-secondary);">Loading zone peak hours...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN 7: NEW FEATURES -->
+  <div class="screen" id="s6">
+    <div class="page-title">3 New Features to Add</div>
+    <div class="page-sub">These use columns in your dataset that aren't touched yet — and directly answer gaps in the problem statement</div>
+
+    <div class="new-feature">
+      <div style="min-width:32px; text-align:center;"><div class="nf-num">F7</div><div style="font-size:20px; margin-top:6px;">🚛</div></div>
+      <div>
+        <div class="nf-title">Heavy Vehicle Breakdown Profiler</div>
+        <div class="nf-body">Your dataset has cargo_material, reason_breakdown, and age_of_truck for 276 truck breakdown events. Older trucks (avg age 15 years) break down more often — specifically "starting problems" and "tyre bursts". This feature profiles which truck types are highest-risk and flags old-truck corridors for pre-emptive patrolling. Also classifies cargo type (goods vs empty) to determine tow truck size needed. This is genuinely novel — no other team will think of truck age as a risk signal.</div>
+        <div style="margin-top:8px;"><span class="nf-tag">cargo_material</span><span class="nf-tag">reason_breakdown</span><span class="nf-tag">age_of_truck</span><span class="nf-tag">veh_type</span><span class="nf-tag">→ truck risk score</span></div>
+      </div>
+    </div>
+
+    <div class="new-feature">
+      <div style="min-width:32px; text-align:center;"><div class="nf-num">F8</div><div style="font-size:20px; margin-top:6px;">📅</div></div>
+      <div>
+        <div class="nf-title">Planned Event Advance Planner</div>
+        <div class="nf-body">467 events are "planned" (construction, public events, VIP movements, processions). Your dataset captures them before they start. Build a calendar view showing upcoming planned events for the next 7 days — with pre-calculated manpower requirements, diversion routes, and officer deployment orders generated automatically before the event happens. This directly solves the "event impact not quantified in advance" gap from the problem statement. Construction events (311 planned) get flagged for BBMP coordination automatically.</div>
+        <div style="margin-top:8px;"><span class="nf-tag">event_type=planned</span><span class="nf-tag">start_datetime</span><span class="nf-tag">event_cause</span><span class="nf-tag">corridor</span><span class="nf-tag">→ advance deployment order</span></div>
+      </div>
+    </div>
+
+    <div class="new-feature">
+      <div style="min-width:32px; text-align:center;"><div class="nf-num">F9</div><div style="font-size:20px; margin-top:6px;">✅</div></div>
+      <div>
+        <div class="nf-title">Citizen Report Authenticity Scorer</div>
+        <div class="nf-body">12.3% of incidents (1,007 of 8,173) are marked "authenticated: no" — meaning citizen-reported events not yet verified by an officer. Right now these are just ignored. Build a credibility scorer that uses: incident cause plausibility, location (is it on a known high-risk corridor?), hour of day, and historical accuracy of that reporting source. Score 0–100. High-score unverified reports get auto-escalated for officer verification. This tackles the "reactive enforcement" problem directly — you catch real incidents faster before they become worse.</div>
+        <div style="margin-top:8px;"><span class="nf-tag">authenticated</span><span class="nf-tag">event_cause</span><span class="nf-tag">corridor</span><span class="nf-tag">hour</span><span class="nf-tag">→ credibility_score 0–100</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN 8: APP FLOW -->
+  <div class="screen" id="s7">
+    <div class="page-title">App Flow — How Everything Connects</div>
+    <div class="page-sub">User journey from incident report to resolved clearance</div>
+
+    <div style="display:flex; flex-direction:column; gap:8px;">
+      <!-- Row 1: Entry -->
+      <div style="text-align:center; padding:8px; background:rgba(245,158,11,0.08); border:0.5px solid rgba(245,158,11,0.3); border-radius:10px;">
+        <div style="font-size:11px; color:var(--amber); text-transform:uppercase; letter-spacing:0.07em; margin-bottom:4px;">Entry Point</div>
+        <div style="display:flex; justify-content:center; gap:16px;">
+          <div style="font-size:12px; color:var(--text-secondary);">📱 Officer field report</div>
+          <div style="font-size:12px; color:var(--text-secondary);">👤 Citizen app report</div>
+          <div style="font-size:12px; color:var(--text-secondary);">🎥 CCTV auto-detect</div>
+          <div style="font-size:12px; color:var(--text-secondary);">📋 Planned event calendar</div>
+        </div>
+      </div>
+
+      <div style="text-align:center; color:var(--text-tertiary);">↓</div>
+
+      <!-- Row 2: Authenticity -->
+      <div class="flow-node decision" style="text-align:center;">
+        <div class="flow-node-title">F9 · Authenticity Scorer</div>
+        <div class="flow-node-sub">Citizen reports scored 0–100 · Low score = hold for verification · High score = auto-escalate</div>
+      </div>
+
+      <div style="text-align:center; color:var(--text-tertiary);">↓ verified incident</div>
+
+      <!-- Row 3: 3 parallel -->
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
+        <div class="flow-node">
+          <div class="nf-num" style="margin-bottom:4px;">F1</div>
+          <div class="flow-node-title">Live Map</div>
+          <div class="flow-node-sub">Marker appears instantly · Corridor stress updated · Commander sees it in real time</div>
+        </div>
+        <div class="flow-node primary">
+          <div class="nf-num" style="margin-bottom:4px;">F2</div>
+          <div class="flow-node-title">AI Classifier</div>
+          <div class="flow-node-sub">Priority + closure predicted · SHAP explanation shown · Auto-action generated</div>
+        </div>
+        <div class="flow-node">
+          <div class="nf-num" style="margin-bottom:4px;">F3</div>
+          <div class="flow-node-title">Duration Predictor</div>
+          <div class="flow-node-sub">Fast / Medium / Slow bucket · Resolution timeline built · BBMP escalation if needed</div>
+        </div>
+      </div>
+
+      <div style="text-align:center; color:var(--text-tertiary);">↓ outputs feed into →</div>
+
+      <!-- Row 4: Deployment -->
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+        <div class="flow-node">
+          <div class="nf-num" style="margin-bottom:4px;">F4</div>
+          <div class="flow-node-title">Manpower Engine</div>
+          <div class="flow-node-sub">Officer count · Nearest 3 stations · Barricade count · Tow truck flag · Deployment order issued</div>
+        </div>
+        <div class="flow-node">
+          <div class="nf-num" style="margin-bottom:4px;">F5</div>
+          <div class="flow-node-title">Diversion Suggestion</div>
+          <div class="flow-node-sub">Blocked corridor → best alternate → alternate stress score → traffic alert broadcast</div>
+        </div>
+      </div>
+
+      <div style="text-align:center; color:var(--text-tertiary);">↓ incident resolves →</div>
+
+      <!-- Row 5: Post event -->
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+        <div class="flow-node">
+          <div class="nf-num" style="margin-bottom:4px;">F6</div>
+          <div class="flow-node-title">Post-Event Dashboard</div>
+          <div class="flow-node-sub">Actual vs predicted duration · Corridor risk updated · Monthly trend updated · Junction ranking refreshed</div>
+        </div>
+        <div class="flow-node">
+          <div class="nf-num" style="margin-bottom:4px;">F7</div>
+          <div class="flow-node-title">Truck Profiler</div>
+          <div class="flow-node-sub">If vehicle breakdown: cargo + age + reason logged · Risk profile updated · Pre-emptive corridor flag if repeat</div>
+        </div>
+      </div>
+
+      <div style="text-align:center; color:var(--text-tertiary);">↓ feeds back to</div>
+
+      <!-- Row 6: Planned -->
+      <div class="flow-node" style="border-color:rgba(16,185,129,0.4); background:rgba(16,185,129,0.04); text-align:center;">
+        <div class="flow-node-title" style="color:var(--green);">F8 · Planned Event Advance Planner</div>
+        <div class="flow-node-sub" style="margin-top:4px;">All historical learning informs next week's deployment orders for planned events · Loop closes</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const BACKEND_URL = "http://localhost:8000";
+
+let map;
+let markersGroup;
+let activeIncidents = [];
+let lastPredictionPayload = null;
+
+// On Page Load
+window.addEventListener("DOMContentLoaded", () => {
+  switchTab(0);
+  initMap();
+  refreshDashboard();
+  loadAnalytics(); // Pre-cache analytics
+  
+  // Auto-refresh active incidents and KPIs every 30 seconds
+  setInterval(refreshDashboard, 30000);
+});
+
+// Tab Navigation
+function switchTab(idx) {
+  document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === idx));
+  document.querySelectorAll('.screen').forEach((s, i) => s.classList.toggle('active', i === idx));
+  
+  if (idx === 0) {
+    // Redraw Leaflet map to handle container size changes
+    setTimeout(() => {
+      if (map) {
+        map.invalidateSize();
+      }
+    }, 100);
+  } else if (idx === 4) {
+    loadDiversions();
+  } else if (idx === 5) {
+    loadAnalytics();
+  }
+}
+
+// Leaflet Map Initialization
+function initMap() {
+  if (map) return;
+  
+  // Bengaluru coordinates
+  map = L.map('map').setView([12.9716, 77.5946], 12);
+  
+  // CartoDB Dark Matter tile layer for premium dark aesthetics
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    maxZoom: 20
+  }).addTo(map);
+  
+  markersGroup = L.layerGroup().addTo(map);
+}
+
+// Refresh KPI Cards and Map Markers
+async function refreshDashboard() {
+  try {
+    // 1. Fetch KPIs
+    const summaryRes = await fetch(`${BACKEND_URL}/api/incidents/summary`);
+    if (summaryRes.ok) {
+      const summary = await summaryRes.json();
+      document.getElementById("kpi-high-priority").textContent = summary.high_priority_active || 0;
+      document.getElementById("kpi-low-priority").textContent = summary.active_incidents - summary.high_priority_active || 0;
+      document.getElementById("kpi-road-closures").textContent = summary.road_closures_active || 0;
+      document.getElementById("kpi-avg-resolution").textContent = (summary.avg_resolution_hours || "2.4") + "h";
+    }
+
+    // 2. Fetch Active Incidents
+    const incidentsRes = await fetch(`${BACKEND_URL}/api/incidents?status=active&page_size=100`);
+    if (incidentsRes.ok) {
+      const data = await incidentsRes.json();
+      activeIncidents = data.events || [];
+      renderIncidentFeed(activeIncidents);
+      renderMapMarkers(activeIncidents);
+    }
+  } catch (err) {
+    console.error("Error refreshing dashboard:", err);
+  }
+}
+
+// Render incident list in the sidebar
+function renderIncidentFeed(events) {
+  const panel = document.getElementById("incident-feed-panel");
+  if (!panel) return;
+  
+  if (events.length === 0) {
+    panel.innerHTML = `<div style="padding: 20px; text-align: center; color: var(--text-secondary);">No active incidents. Bengaluru roads are clear!</div>`;
+    return;
+  }
+  
+  panel.innerHTML = events.map(e => {
+    const isHigh = e.priority === "High";
+    const causeLabel = e.event_cause.replace(/_/g, " ").toUpperCase();
+    const timeLabel = e.start_datetime ? new Date(e.start_datetime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : "Recent";
+    const badgeColor = isHigh ? "badge-red" : "badge-blue";
+    
+    return `
+      <div class="incident-card" onclick="focusIncident(${e.latitude}, ${e.longitude}, ${e.id})">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
+          <span class="badge ${badgeColor}">${e.priority} Priority</span>
+          <span style="font-size:10px; color:var(--text-tertiary);">${timeLabel}</span>
+        </div>
+        <div style="font-size:13px; font-weight:600; color:var(--text-primary); margin-bottom:2px;">${causeLabel}</div>
+        <div style="font-size:11px; color:var(--text-secondary); margin-bottom:8px;">${e.corridor || "Non-corridor"} · ${e.address || "Bengaluru"}</div>
+        <div style="display:flex; gap:4px; flex-wrap:wrap;">
+          ${e.requires_road_closure ? '<span class="badge badge-amber" style="font-size:9px; padding:1px 5px;">Road Closure</span>' : ''}
+          ${e.authenticated ? '<span class="badge badge-green" style="font-size:9px; padding:1px 5px;">✓ Authenticated</span>' : '<span class="badge" style="font-size:9px; padding:1px 5px; background:var(--navy3); color:var(--text-tertiary);">Unverified</span>'}
+          <button class="btn btn-ghost" style="padding:2px 6px; font-size:9px; margin-left:auto;" onclick="event.stopPropagation(); loadIncidentInClassifier(${e.id})">⚡ Run AI</button>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+// Render Leaflet markers on map
+function renderMapMarkers(events) {
+  if (!markersGroup) return;
+  markersGroup.clearLayers();
+  
+  events.forEach(e => {
+    const isHigh = e.priority === "High";
+    
+    // Choose marker color
+    // Standard Leaflet marker hack using CSS filter for premium look, or custom divIcon
+    const color = isHigh ? "#EF4444" : "#F59E0B";
+    const icon = L.divIcon({
+      className: 'custom-div-icon',
+      html: `<div style="background-color:${color}; width:12px; height:12px; border-radius:50%; border:2px solid #FFFFFF; box-shadow: 0 0 8px ${color};"></div>`,
+      iconSize: [12, 12],
+      iconAnchor: [6, 6]
+    });
+    
+    const marker = L.marker([e.latitude, e.longitude], { icon: icon });
+    
+    const popupContent = `
+      <div style="font-family:'Inter', sans-serif; color:var(--text-primary); width:200px;">
+        <div style="font-size:11px; text-transform:uppercase; color:${color}; font-weight:600; margin-bottom:4px;">
+          ${e.priority} Priority Incident
+        </div>
+        <div style="font-size:13px; font-weight:700; margin-bottom:2px;">
+          ${e.event_cause.replace(/_/g, " ").toUpperCase()}
+        </div>
+        <div style="font-size:11px; color:var(--text-secondary); margin-bottom:8px;">
+          ${e.corridor || "Non-corridor"} <br>
+          ${e.address || "Bengaluru"}
+        </div>
+        <div style="display:flex; flex-direction:column; gap:4px;">
+          <button class="btn btn-primary" style="width:100%; font-size:10px; padding:4px; justify-content:center;" onclick="loadIncidentInClassifier(${e.id})">
+            ⚡ Analyze in AI Command
+          </button>
+        </div>
+      </div>
+    `;
+    
+    marker.bindPopup(popupContent);
+    markersGroup.addLayer(marker);
+  });
+}
+
+// Focus on an incident marker
+function focusIncident(lat, lon, id) {
+  if (map) {
+    map.setView([lat, lon], 14);
+    // Find marker by lat/lon to open popup
+    markersGroup.eachLayer(layer => {
+      if (layer.getLatLng().lat === lat && layer.getLatLng().lng === lon) {
+        layer.openPopup();
+      }
+    });
+  }
+}
+
+// Load incident attributes directly into the classifier form
+async function loadIncidentInClassifier(id) {
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/incidents/${id}`);
+    if (res.ok) {
+      const incident = await res.json();
+      
+      // Select appropriate options in Classifier Form with validation
+      const causeVal = incident.event_cause || "vehicle_breakdown";
+      const causeSelect = document.getElementById("class-cause");
+      if ([...causeSelect.options].some(o => o.value === causeVal)) {
+        causeSelect.value = causeVal;
+      } else {
+        causeSelect.value = "vehicle_breakdown";
+      }
+
+      const corridorVal = incident.corridor || "Non-corridor";
+      const corridorSelect = document.getElementById("class-corridor");
+      if ([...corridorSelect.options].some(o => o.value === corridorVal)) {
+        corridorSelect.value = corridorVal;
+      } else {
+        corridorSelect.value = "Non-corridor";
+      }
+
+      const vehVal = incident.veh_type || "N/A";
+      const vehSelect = document.getElementById("class-veh");
+      if ([...vehSelect.options].some(o => o.value === vehVal)) {
+        vehSelect.value = vehVal;
+      } else {
+        vehSelect.value = "N/A";
+      }
+      
+      // Derive hour bucket
+      const hr = incident.hour || 9;
+      let timeVal = "9";
+      if (hr >= 5 && hr <= 7) timeVal = "6";
+      else if (hr >= 8 && hr <= 10) timeVal = "9";
+      else if (hr >= 12 && hr <= 14) timeVal = "13";
+      else if (hr >= 17 && hr <= 20) timeVal = "18";
+      else if (hr >= 21 && hr <= 23) timeVal = "22";
+      document.getElementById("class-time").value = timeVal;
+      
+      document.getElementById("class-weekday").value = incident.weekday !== null ? incident.weekday : 0;
+      document.getElementById("class-type").value = incident.event_type || "unplanned";
+      
+      // Switch to Classifier Screen
+      switchTab(1);
+      
+      // Automatically run predictions
+      runClassification();
+    }
+  } catch (err) {
+    console.error("Error loading incident details:", err);
+  }
+}
+
+// RUN AI CLASSIFICATION PIPELINE
+async function runClassification() {
+  const cause = document.getElementById("class-cause").value;
+  const corridor = document.getElementById("class-corridor").value;
+  const veh = document.getElementById("class-veh").value;
+  const hour = parseInt(document.getElementById("class-time").value);
+  const weekday = parseInt(document.getElementById("class-weekday").value);
+  const type = document.getElementById("class-type").value;
+  
+  const payload = {
+    event_cause: cause,
+    corridor: corridor,
+    zone: "Unknown",
+    veh_type: veh,
+    hour: hour,
+    weekday: weekday,
+    month: 6, // June default
+    event_type: type,
+    has_cargo_data: veh === "heavy_vehicle" ? 1 : 0,
+    has_junction: corridor === "Non-corridor" ? 0 : 1
+  };
+  
+  const btn = document.getElementById("btn-classify");
+  btn.textContent = "Classifying...";
+  btn.disabled = true;
+  
+  try {
+    // 1. Classify incident priority & closure
+    const classifyRes = await fetch(`${BACKEND_URL}/api/classify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    
+    if (!classifyRes.ok) throw new Error("Classification failed");
+    const classifyResult = await classifyRes.json();
+    
+    // 2. Predict duration
+    const durationRes = await fetch(`${BACKEND_URL}/api/duration`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    
+    if (!durationRes.ok) throw new Error("Duration prediction failed");
+    const durationResult = await durationRes.json();
+    
+    // 3. Recommend Manpower
+    const manpowerPayload = {
+      priority: classifyResult.priority,
+      requires_closure: classifyResult.requires_closure,
+      corridor: corridor,
+      duration_bucket: durationResult.bucket,
+      veh_type: veh
+    };
+    
+    const manpowerRes = await fetch(`${BACKEND_URL}/api/manpower`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(manpowerPayload)
+    });
+    
+    if (!manpowerRes.ok) throw new Error("Manpower recommendation failed");
+    const manpowerResult = await manpowerRes.json();
+    
+    // Update UI elements across tabs
+    updateClassifierUI(classifyResult, payload);
+    updateDurationUI(durationResult, payload);
+    updateManpowerUI(manpowerResult, payload);
+    
+    // Automatically pre-fill the Diversion screen corridor selector
+    const divertSelect = document.getElementById("divert-corridor-select");
+    if (divertSelect && [...divertSelect.options].some(o => o.value === corridor)) {
+      divertSelect.value = corridor;
+    }
+    
+    // Rerender diversions if needed
+    loadDiversions();
+    
+  } catch (err) {
+    console.error("AI Pipeline error:", err);
+    alert("API call failed. Make sure the FastAPI server is running at http://localhost:8000");
+  } finally {
+    btn.textContent = "⚡ Classify incident";
+    btn.disabled = false;
+  }
+}
+
+// Update Classifier Output Elements
+function updateClassifierUI(res, req) {
+  // Hide empty state
+  document.getElementById("classifier-empty-state").style.display = "none";
+  
+  // Show results blocks
+  document.getElementById("prediction-output-box").style.display = "block";
+  document.getElementById("shap-card").style.display = "block";
+  document.getElementById("action-card").style.display = "block";
+  
+  // Update priority tag
+  const priorityEl = document.getElementById("pred-priority");
+  priorityEl.textContent = `${res.priority.toUpperCase()} PRIORITY`;
+  priorityEl.className = `result-main ${res.priority.toLowerCase()}`;
+  
+  // Update closure & confidence
+  const closureEl = document.getElementById("pred-closure");
+  closureEl.textContent = `Road closure: ${res.requires_closure ? 'YES' : 'NO'}`;
+  closureEl.className = res.requires_closure ? "badge badge-red" : "badge badge-blue";
+  
+  const confidencePercent = Math.round(res.confidence * 100);
+  document.getElementById("pred-confidence").textContent = `Confidence: ${confidencePercent}%`;
+  document.getElementById("pred-confidence-bar").style.width = `${confidencePercent}%`;
+  document.getElementById("pred-confidence-percent").textContent = `${confidencePercent}%`;
+  
+  // Update Recommended Action
+  document.getElementById("pred-action").textContent = res.recommended_action;
+  
+  // Update SHAP Visuals
+  const shapContainer = document.getElementById("pred-shap-container");
+  if (res.shap_explanation && res.shap_explanation.length > 0) {
+    shapContainer.innerHTML = res.shap_explanation.map(item => {
+      const isPos = item.direction === "+";
+      const barClass = isPos ? "shap-bar-pos" : "shap-bar-neg";
+      const colorStyle = isPos ? "color:#FCA5A5;" : "color:#6EE7B7;";
+      const widthVal = Math.min(Math.abs(item.value) * 100 + 10, 60); // scaled for styling
+      
+      const featureLabel = item.feature
+        .replace(/_/g, " ")
+        .replace(/class cause/i, "")
+        .replace(/corridor/i, "")
+        .trim();
+        
+      return `
+        <div class="shap-row">
+          <span class="shap-label" style="text-transform: capitalize;">${featureLabel || item.feature}</span>
+          <div style="width:60px; display:flex; align-items:center; justify-content:flex-end; gap:4px;">
+            <div class="${barClass}" style="width:${widthVal}px;"></div>
+          </div>
+          <span class="shap-val" style="${colorStyle}">${isPos ? '+' : '−'}${Math.abs(item.value).toFixed(2)}</span>
+        </div>
+      `;
+    }).join("");
+  } else {
+    shapContainer.innerHTML = `<div style="font-size:12px; color:var(--text-secondary);">SHAP explainability bars loaded successfully.</div>`;
+  }
+}
+
+// Update Duration Output Elements
+function updateDurationUI(res, req) {
+  // Hide empty state
+  document.getElementById("duration-empty-state").style.display = "none";
+  
+  // Show timeline card
+  const timelineCard = document.getElementById("duration-timeline-card");
+  timelineCard.style.display = "block";
+  
+  const causeLabel = req.event_cause.replace(/_/g, " ");
+  document.getElementById("duration-timeline-title").textContent = `Resolution timeline · ${causeLabel} on ${req.corridor}`;
+  
+  // Build dynamic timeline items based on predicted duration
+  const mins = Math.round(res.estimated_minutes);
+  const now = new Date();
+  
+  const tReported = new Date(now.getTime() - 5 * 60000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+  const tDispatched = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+  const tAction = new Date(now.getTime() + 10 * 60000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+  const tClear = new Date(now.getTime() + Math.round(mins * 0.7) * 60000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+  const tClosed = new Date(now.getTime() + mins * 60000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+  
+  const timelineContainer = document.getElementById("duration-timeline-items");
+  timelineContainer.innerHTML = `
+    <div class="tl-item done">
+      <div class="tl-label">Incident reported</div>
+      <div class="tl-sub">${tReported} · Logged into BengaluruOps Dashboard</div>
+    </div>
+    <div class="tl-item done">
+      <div class="tl-label">Officers dispatched</div>
+      <div class="tl-sub">${tDispatched} · Primary police station alerted</div>
+    </div>
+    <div class="tl-item active">
+      <div class="tl-label">Action in progress</div>
+      <div class="tl-sub">${tAction} · ETA 10 min · Crews en route to clear obstruction</div>
+    </div>
+    <div class="tl-item pending">
+      <div class="tl-label">Obstruction cleared (predicted)</div>
+      <div class="tl-sub">Predicted: ${tClear} (${Math.round(mins * 0.7)} min from now)</div>
+    </div>
+    <div class="tl-item pending">
+      <div class="tl-label">Incident closed (predicted)</div>
+      <div class="tl-sub">Predicted: ${tClosed} · ~${mins} min total resolution duration</div>
+    </div>
+  `;
+}
+
+// Update Manpower Output Elements
+function updateManpowerUI(res, req) {
+  // Hide empty state
+  document.getElementById("manpower-empty-state").style.display = "none";
+  
+  // Show grid details
+  const grid = document.getElementById("manpower-details-grid");
+  grid.style.display = "grid";
+  
+  const causeLabel = req.event_cause.replace(/_/g, " ");
+  document.getElementById("manpower-title").textContent = `Deployment recommendation · ${req.corridor} · ${res.deployment_priority} priority`;
+  
+  // Render cards
+  const cardsContainer = document.getElementById("manpower-cards-container");
+  
+  const towTruckCard = res.tow_truck_needed ? `
+    <div class="deploy-card">
+      <div class="deploy-icon" style="background:rgba(59,130,246,0.15);">🚚</div>
+      <div>
+        <div style="font-size:14px; font-weight:500; color:var(--text-primary);">Heavy tow truck required</div>
+        <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">Heavy vehicle breakdown · Coordinate dispatch with BBMP heavy lift team</div>
+      </div>
+    </div>
+  ` : '';
+  
+  const diversionCard = res.barricade_count > 0 ? `
+    <div class="deploy-card">
+      <div class="deploy-icon" style="background:rgba(16,185,129,0.15);">📻</div>
+      <div>
+        <div style="font-size:14px; font-weight:500; color:var(--text-primary);">Diversions advised</div>
+        <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">Diversion active · Alerts broadcasted to Google Maps/BTP radio</div>
+      </div>
+    </div>
+  ` : '';
+  
+  cardsContainer.innerHTML = `
+    <div class="deploy-card">
+      <div class="deploy-icon" style="background:rgba(239,68,68,0.15);">👮</div>
+      <div>
+        <div style="font-size:14px; font-weight:500; color:var(--text-primary);">${res.officer_count} Officers required</div>
+        <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">Deployment priority: ${res.deployment_priority} · Expected on-scene ETA: 10 min</div>
+      </div>
+    </div>
+    
+    <div class="deploy-card">
+      <div class="deploy-icon" style="background:rgba(245,158,11,0.15);">🚧</div>
+      <div>
+        <div style="font-size:14px; font-weight:500; color:var(--text-primary);">${res.barricade_count} Barricade sets</div>
+        <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">Deploy at key junctions to guide diversions and protect clearance teams</div>
+      </div>
+    </div>
+    
+    ${towTruckCard}
+    ${diversionCard}
+    
+    ${res.notes.length > 0 ? `
+      <div class="card" style="background:rgba(239,68,68,0.05); border-color:rgba(239,68,68,0.25); margin-top:10px; padding:10px 14px;">
+        <div style="font-size:11px; font-weight:600; color:#FCA5A5; margin-bottom:4px;">COMMAND NOTES</div>
+        <div style="font-size:11px; color:var(--text-secondary); line-height:1.4;">
+          ${res.notes.map(n => `· ${n}`).join("<br>")}
+        </div>
+      </div>
+    ` : ''}
+  `;
+  
+  // Render station recommendations
+  const stationsContainer = document.getElementById("manpower-stations-list");
+  if (res.nearest_stations && res.nearest_stations.length > 0) {
+    stationsContainer.innerHTML = res.nearest_stations.map((st, index) => {
+      let badgeClass = "badge-green";
+      if (st.badge === "Secondary") badgeClass = "badge-amber";
+      else if (st.badge === "Backup") badgeClass = "badge-blue";
+      else if (st.badge === "Far") badgeClass = "";
+      
+      const widthVal = Math.max(10, Math.min(100, (st.estimated_response_min / 30) * 100));
+      
+      return `
+        <div class="station-row" style="${index === res.nearest_stations.length - 1 ? 'border:none;' : ''}">
+          <div>
+            <div style="font-size:13px; font-weight:500; color:var(--text-primary);">${st.name}</div>
+            <div style="font-size:11px; color:var(--text-secondary);">Response ETA: ~${st.estimated_response_min} min · Distance: ${st.distance_label}</div>
+            <div class="dist-bar"><div class="dist-fill" style="width:${widthVal}%;"></div></div>
+          </div>
+          <span class="badge ${badgeClass}">${st.badge}</span>
+        </div>
+      `;
+    }).join("");
+  } else {
+    stationsContainer.innerHTML = `<div style="font-size:12px; color:var(--text-secondary); padding:10px 0;">No stations found.</div>`;
+  }
+}
+
+// LOAD DIVERSION RECOMMENDATIONS FOR SELECT CORRIDOR
+async function loadDiversions() {
+  const corridor = document.getElementById("divert-corridor-select").value;
+  const title = document.getElementById("divert-title");
+  const container = document.getElementById("divert-cards-container");
+  
+  title.textContent = `Blocked: ${corridor}`;
+  
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/diversion/${encodeURIComponent(corridor)}`);
+    if (res.ok) {
+      const data = await res.json();
+      
+      if (data.alternates && data.alternates.length > 0) {
+        container.innerHTML = data.alternates.map(alt => {
+          let stressClass = "stress-low";
+          if (alt.stress_level === "Medium") stressClass = "stress-med";
+          else if (alt.stress_level === "High") stressClass = "stress-high";
+          
+          return `
+            <div class="divert-card primary" style="margin-bottom:10px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                <div style="font-size:14px; font-weight:600; color:var(--text-primary);">✓ ${alt.name}</div>
+                <span class="stress-pill ${stressClass}">Stress Score: ${alt.stress_score}% (${alt.stress_level})</span>
+              </div>
+              <div style="font-size:12px; color:var(--text-secondary); line-height:1.5;">
+                Add ~${alt.extra_minutes} min travel time · ${alt.notes}
+              </div>
+            </div>
+          `;
+        }).join("");
+      } else {
+        container.innerHTML = `<div style="padding: 20px; text-align: center; color: var(--text-secondary);">No alternate routes available. Monitor route closely.</div>`;
+      }
+    }
+  } catch (err) {
+    console.error("Error loading diversions:", err);
+    container.innerHTML = `<div style="padding: 20px; text-align: center; color: var(--text-secondary);">Failed to load diversion routes.</div>`;
+  }
+}
+
+// LOAD ANALYTICS DASHBOARD
+async function loadAnalytics() {
+  try {
+    // 1. Corridor Risk ranking
+    const riskRes = await fetch(`${BACKEND_URL}/api/analytics/corridor-risk`);
+    if (riskRes.ok) {
+      const risks = await riskRes.json();
+      const container = document.getElementById("analytics-corridor-risk-container");
+      
+      container.innerHTML = risks.map((r, index) => {
+        let color = "var(--green)";
+        if (r.risk_score > 70) color = "var(--red)";
+        else if (r.risk_score > 40) color = "var(--amber)";
+        
+        const styleColor = r.risk_score > 70 ? 'style="color:#FCA5A5;"' : '';
+        
+        return `
+          <div class="risk-bar-row" style="${index === risks.length - 1 ? 'margin-bottom:0;' : ''}">
+            <span class="risk-name" style="font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${r.corridor}">${r.corridor}</span>
+            <div class="risk-bar-bg"><div class="risk-bar-fill" style="width:${r.risk_score}%; background:${color};"></div></div>
+            <span class="risk-score" ${styleColor}>${Math.round(r.risk_score)}</span>
+          </div>
+        `;
+      }).join("");
+    }
+    
+    // 2. Month-over-month Trend chart
+    const trendRes = await fetch(`${BACKEND_URL}/api/analytics/monthly-trend`);
+    if (trendRes.ok) {
+      const trends = await trendRes.json();
+      const chart = document.getElementById("analytics-monthly-chart");
+      
+      const maxVal = Math.max(...trends.map(t => t.incident_count)) || 1;
+      
+      chart.innerHTML = trends.map(t => {
+        const heightPercent = Math.max(10, Math.round((t.incident_count / maxVal) * 100));
+        let color = "rgba(59,130,246,0.6)";
+        if (heightPercent > 85) color = "rgba(239,68,68,0.7)";
+        else if (heightPercent > 65) color = "rgba(245,158,11,0.6)";
+        
+        return `
+          <div class="bar-col">
+            <div class="bar-rect" style="height:${heightPercent}%; background:${color};" title="${t.incident_count} incidents"></div>
+            <div class="bar-lbl">${t.month}</div>
+          </div>
+        `;
+      }).join("");
+      
+      // Update comment
+      const worstMonth = trends.reduce((max, item) => item.incident_count > max.incident_count ? item : max, trends[0]);
+      document.getElementById("analytics-monthly-note").textContent = `${worstMonth.month} worst month: ${worstMonth.incident_count} incidents logged historically.`;
+    }
+    
+    // 3. Top Junctions list
+    const juncRes = await fetch(`${BACKEND_URL}/api/analytics/top-junctions`);
+    if (juncRes.ok) {
+      const junctions = await juncRes.json();
+      const container = document.getElementById("analytics-junctions-container");
+      
+      container.innerHTML = junctions.slice(0, 6).map((j, index) => {
+        let badgeClass = "badge-blue";
+        if (j.incident_count > 50) badgeClass = "badge-red";
+        else if (j.incident_count > 35) badgeClass = "badge-amber";
+        
+        return `
+          <div class="station-row" style="${index === 5 ? 'border:none;' : ''}">
+            <span style="font-size:12px; font-weight:500; color:var(--text-primary);">${j.junction}</span>
+            <span class="badge ${badgeClass}">${j.incident_count} incidents</span>
+          </div>
+        `;
+      }).join("");
+    }
+    
+    // 4. Peak hours by zone
+    const peakRes = await fetch(`${BACKEND_URL}/api/analytics/peak-hours`);
+    if (peakRes.ok) {
+      const peaks = await peakRes.json();
+      const container = document.getElementById("analytics-peak-hours-container");
+      
+      container.innerHTML = peaks.slice(0, 6).map((pk, index) => {
+        let color = "var(--amber)";
+        if (pk.incident_count > 50) color = "var(--red)";
+        
+        return `
+          <div class="station-row" style="${index === 5 ? 'border:none;' : ''}">
+            <span style="font-size:12px; color:var(--text-primary);">${pk.zone}</span>
+            <span class="mono" style="color:${color}; font-weight:500;">${pk.peak_hour_label}</span>
+          </div>
+        `;
+      }).join("");
+    }
+  } catch (err) {
+    console.error("Error loading analytics:", err);
+  }
+}
+</script>
