@@ -257,10 +257,37 @@ export default function AICommand({
                         const isPositive = shap.value >= 0;
                         const absVal = Math.abs(shap.value);
                         const barWidth = Math.min(100, Math.round(absVal * 120)); // scaled
-                        
+
+                        // Convert OHE feature names to human-readable labels
+                        const formatShapLabel = (raw) => {
+                          if (!raw || raw === "shap_unavailable") return "Unavailable";
+                          const prefixMap = {
+                            "corridor_": "📍 ",
+                            "event_cause_": "⚡ ",
+                            "veh_type_": "🚗 ",
+                            "weekday_name_": "📅 ",
+                            "event_type_": "📋 ",
+                          };
+                          for (const [prefix, icon] of Object.entries(prefixMap)) {
+                            if (raw.startsWith(prefix)) {
+                              return icon + raw.slice(prefix.length).replace(/_/g, " ");
+                            }
+                          }
+                          // Plain numeric features
+                          const numericMap = {
+                            "is_peak_hour": "🕐 Peak Hour",
+                            "hour": "🕐 Hour of Day",
+                            "weekday": "📅 Day of Week",
+                            "month": "📆 Month",
+                            "has_cargo_data": "📦 Has Cargo",
+                            "has_junction": "🔀 Junction Involved",
+                          };
+                          return numericMap[raw] || raw.replace(/_/g, " ");
+                        };
+
                         return (
                           <div className="shap-row" key={index} style={{ padding: "4px 0" }}>
-                            <span className="shap-label" style={{ fontSize: "11px" }}>{shap.feature}</span>
+                            <span className="shap-label" style={{ fontSize: "11px" }}>{formatShapLabel(shap.feature)}</span>
                             <div style={{ flex: 1, display: "flex", justifyContent: isPositive ? "flex-start" : "flex-end", margin: "0 8px" }}>
                               <div
                                 className={isPositive ? "shap-bar-pos" : "shap-bar-neg"}
