@@ -142,10 +142,12 @@ def sync_tomtom_incidents(db: Session):
     weekday = datetime.now(timezone.utc).weekday()
     month = datetime.now(timezone.utc).month
 
-    # Process all incidents in parallel with LLM
-    import concurrent.futures
-    
-    def process_incident(inc):
+    from ml.predict import predict_priority_batch, predict_closure_batch, predict_duration_batch
+
+    input_data_list = []
+    base_events = []
+
+    for inc in incidents:
         props = inc.get("properties", {})
         geom = inc.get("geometry", {})
 
@@ -155,32 +157,25 @@ def sync_tomtom_incidents(db: Session):
         else:
             lon, lat = coords[0], coords[1]
 
-        # Extract advanced telemetry safely (prevent NoneType errors)
         magnitude = props.get("magnitudeOfDelay") or 0
         delay_sec = props.get("delay") or 0
         length_m = props.get("length") or 0
         
         events_list = props.get("events", [{}])
         desc = events_list[0].get("description", "Unknown Event") if events_list else "Unknown"
-        # tmc (Traffic Message Channel) gives specific lane closure codes
-        tmc_codes = []
-        for e in events_list:
-            if "tmc" in e and "code" in e["tmc"]:
-                tmc_codes.append(str(e["tmc"]["code"]))
+        
+        tmc_codes = [str(e["tmc"]["code"]) for e in events_list if "tmc" in e and "code" in e["tmc"]]
         tmc_str = ",".join(tmc_codes) if tmc_codes else ""
 
         from_loc = props.get("from", "")
         address = f"[LIVE] {desc} near {from_loc}" if from_loc else f"[LIVE] {desc}"
         
-        # Add advanced telemetry to notes
         if delay_sec > 0 or length_m > 0:
             address += f" | {round(length_m)}m affected, {round(delay_sec/60)}m delay (Severity: {magnitude})"
 
-        # Extract real start time
         start_time_str = props.get("startTime")
         if start_time_str:
             try:
-                # TomTom returns ISO8601 strings like "2024-12-08T03:25:30Z"
                 incident_time = datetime.fromisoformat(start_time_str.replace("Z", "+00:00")).replace(tzinfo=None)
             except Exception:
                 incident_time = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -188,11 +183,9 @@ def sync_tomtom_incidents(db: Session):
             incident_time = datetime.now(timezone.utc).replace(tzinfo=None)
             
         icon_category = props.get("iconCategory", 0)
-
-        # Parse with rules
         event_cause, corridor, veh_type = _rule_parse_incident(desc, address, icon_category)
 
-        input_data = {
+        input_data_list.append({
             "event_cause": event_cause,
             "corridor": corridor,
             "zone": "Unknown",
@@ -209,53 +202,53 @@ def sync_tomtom_incidents(db: Session):
             "delay": delay_sec,
             "length": length_m,
             "tmc": tmc_str
-        }
+        })
+        base_events.append({
+            "lat": lat, "lon": lon, "address": address, "incident_time": incident_time,
+            "event_cause": event_cause, "corridor": corridor, "veh_type": veh_type
+        })
 
-        try:
-            p_res = predict_priority(input_data)
-            priority = p_res["priority"]
-            priority_high = p_res["priority_high"]
-            c_res = predict_closure(input_data)
-            requires_closure = int(c_res["requires_closure"])
-        except Exception as e:
-            logger.warning(f"ML classification failed for {address}: {e}")
-            priority, priority_high, requires_closure = "Medium", 0, 0
+    # Batch Process all incidents with ML Models (Blazing Fast)
+    try:
+        p_res_list = predict_priority_batch(input_data_list)
+        c_res_list = predict_closure_batch(input_data_list)
+        for i in range(len(input_data_list)):
+            input_data_list[i]["priority_high"] = p_res_list[i]["priority_high"] if i < len(p_res_list) else 0
+        d_res_list = predict_duration_batch(input_data_list)
+    except Exception as e:
+        logger.warning(f"Batch ML classification failed: {e}")
+        p_res_list = [{"priority": "Medium", "priority_high": 0} for _ in input_data_list]
+        c_res_list = [{"requires_closure": 0} for _ in input_data_list]
+        d_res_list = [{"estimated_minutes": 60.0, "bucket": "Medium"} for _ in input_data_list]
 
-        try:
-            input_data["priority_high"] = priority_high
-            dur_res = predict_duration(input_data)
-            dur_minutes = dur_res["estimated_minutes"]
-            dur_bucket = dur_res["bucket"]
-        except Exception as e:
-            logger.warning(f"ML duration failed for {address}: {e}")
-            dur_minutes, dur_bucket = 60.0, "Medium"
+    new_events = []
+    for i, base in enumerate(base_events):
+        p_res = p_res_list[i] if i < len(p_res_list) else {"priority": "Medium", "priority_high": 0}
+        c_res = c_res_list[i] if i < len(c_res_list) else {"requires_closure": 0}
+        d_res = d_res_list[i] if i < len(d_res_list) else {"estimated_minutes": 60.0, "bucket": "Medium"}
 
-        return Event(
+        new_events.append(Event(
             status="active",
             event_type="unplanned",
-            event_cause=event_cause,
-            corridor=corridor,
+            event_cause=base["event_cause"],
+            corridor=base["corridor"],
             zone="Unknown",
-            veh_type=veh_type,
-            latitude=lat,
-            longitude=lon,
-            address=address,
-            priority=priority,
-            priority_high=priority_high,
-            requires_road_closure=requires_closure,
-            duration_minutes=dur_minutes,
-            duration_bucket=dur_bucket,
+            veh_type=base["veh_type"],
+            latitude=base["lat"],
+            longitude=base["lon"],
+            address=base["address"],
+            priority=p_res["priority"],
+            priority_high=p_res["priority_high"],
+            requires_road_closure=int(c_res["requires_closure"]),
+            duration_minutes=d_res["estimated_minutes"],
+            duration_bucket=d_res["bucket"],
             hour=current_hour,
             weekday=weekday,
             month=month,
             is_peak_hour=1 if (8 <= current_hour <= 10 or 17 <= current_hour <= 20) else 0,
             authenticated=0,
-            start_datetime=incident_time,
-        )
-
-    # Process incidents sequentially (ML models already use native C++ multithreading, so Python threads cause massive contention)
-    results = [process_incident(inc) for inc in incidents]
-    new_events = [r for r in results if r is not None]
+            start_datetime=base["incident_time"],
+        ))
 
     # Now do a smart UPSERT to preserve historical data
     try:

@@ -133,19 +133,17 @@ def load_corridor_risk() -> dict:
 
 # ── Helper: build input DataFrame from request dict ───────────────────────────
 
-def build_input_df(data: dict) -> pd.DataFrame:
+def build_input_df(data: dict | list) -> pd.DataFrame:
     """
-    Convert API request dict to a DataFrame row suitable for model inference.
+    Convert API request dict (or list of dicts) to a DataFrame suitable for model inference.
     Handles hour → weekday, is_peak_hour derivation.
     """
+    if isinstance(data, dict):
+        data = [data]
+        
     PEAK_HOURS = {5, 6, 7, 8, 9, 10, 11, 17, 18, 19, 20, 21}
-    hour = int(data.get("hour", 9))
-    weekday = int(data.get("weekday", 1))  # 0=Mon
+    WEEKDAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
-    WEEKDAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday",
-                     "Friday", "Saturday", "Sunday"]
-
-    cause = data.get("event_cause", "vehicle_breakdown")
     cause_mapping = {
         "Jam": "congestion",
         "Stationary Traffic": "congestion",
@@ -157,25 +155,31 @@ def build_input_df(data: dict) -> pd.DataFrame:
         "lane_closed": "construction",
         "pot_holes": "pot_holes"
     }
-    mapped_cause = cause_mapping.get(cause, cause)
 
-    row = {
-        "event_cause": mapped_cause,
-        "corridor": data.get("corridor", "Non-corridor"),
-        "zone": data.get("zone", "Unknown"),
-        "veh_type": data.get("veh_type", "N/A"),
-        "weekday_name": WEEKDAY_NAMES[weekday % 7],
-        "event_type": data.get("event_type", "unplanned"),
-        "hour": hour,
-        "month": int(data.get("month", 6)),
-        "is_peak_hour": int(hour in PEAK_HOURS),
-        "weekday": weekday,
-        "has_cargo_data": int(data.get("has_cargo_data", 0)),
-        "priority_high": int(data.get("priority_high", 0)),  # for duration only
-        "has_junction": int(data.get("has_junction", 0)),
-    }
-    return pd.DataFrame([row])
+    rows = []
+    for d in data:
+        hour = int(d.get("hour", 9))
+        weekday = int(d.get("weekday", 1))  # 0=Mon
+        cause = d.get("event_cause", "vehicle_breakdown")
+        mapped_cause = cause_mapping.get(cause, cause)
 
+        rows.append({
+            "event_cause": mapped_cause,
+            "corridor": d.get("corridor", "Non-corridor"),
+            "zone": d.get("zone", "Unknown"),
+            "veh_type": d.get("veh_type", "N/A"),
+            "weekday_name": WEEKDAY_NAMES[weekday % 7],
+            "event_type": d.get("event_type", "unplanned"),
+            "hour": hour,
+            "month": int(d.get("month", 6)),
+            "is_peak_hour": int(hour in PEAK_HOURS),
+            "weekday": weekday,
+            "has_cargo_data": int(d.get("has_cargo_data", 0)),
+            "priority_high": int(d.get("priority_high", 0)),
+            "has_junction": int(d.get("has_junction", 0)),
+        })
+        
+    return pd.DataFrame(rows)
 
 # ── Prediction Functions ───────────────────────────────────────────────────────
 
@@ -200,6 +204,30 @@ def predict_priority(data: dict) -> dict:
             "High": round(float(proba[1]), 3),
         },
     }
+
+def predict_priority_batch(data_list: list) -> list[dict]:
+    """Batch predict priority to prevent timeouts on large datasets."""
+    if not data_list: return []
+    pipeline = load_priority_model()
+    X = build_input_df(data_list)
+    proba_batch = pipeline.predict_proba(X)
+    classes = pipeline.classes_
+    
+    results = []
+    for proba in proba_batch:
+        pred_class = classes[np.argmax(proba)]
+        confidence = float(np.max(proba))
+        confidence = min(0.97, confidence) if confidence > 0.97 else confidence
+        results.append({
+            "priority": "High" if pred_class == 1 else "Low",
+            "priority_high": int(pred_class),
+            "confidence": round(confidence, 3),
+            "probabilities": {
+                "Low": round(float(proba[0]), 3),
+                "High": round(float(proba[1]), 3),
+            },
+        })
+    return results
 
 
 def predict_closure(data: dict) -> dict:
@@ -231,6 +259,37 @@ def predict_closure(data: dict) -> dict:
             "Yes": round(float(proba[1]), 3),
         },
     }
+
+def predict_closure_batch(data_list: list) -> list[dict]:
+    if not data_list: return []
+    pipeline = load_closure_model()
+    X = build_input_df(data_list)
+    proba_batch = pipeline.predict_proba(X)
+    
+    results = []
+    for i, proba in enumerate(proba_batch):
+        pred_class = 1 if proba[1] >= 0.50 else 0
+        confidence = float(proba[1]) if pred_class == 1 else float(proba[0])
+        
+        raw_cause = data_list[i].get("event_cause", "")
+        veh_type = data_list[i].get("veh_type", "")
+        
+        if raw_cause in ["road_closed", "lane_closed", "tree_fall", "water_logging"]:
+            pred_class = 1
+            confidence = max(0.95, confidence)
+        elif raw_cause == "accident" and veh_type in ["heavy_vehicle", "bus"]:
+            pred_class = 1
+            confidence = max(0.85, confidence)
+
+        results.append({
+            "requires_closure": bool(pred_class),
+            "confidence": round(confidence, 3),
+            "probabilities": {
+                "No": round(float(proba[0]), 3),
+                "Yes": round(float(proba[1]), 3),
+            },
+        })
+    return results
 
 
 def predict_duration(data: dict) -> dict:
@@ -268,6 +327,46 @@ def predict_duration(data: dict) -> dict:
             for cls, p in zip(bucket_classes, bucket_proba)
         },
     }
+
+def predict_duration_batch(data_list: list) -> list[dict]:
+    if not data_list: return []
+    bucket_model = load_duration_bucket_model()
+    reg_model = load_duration_regression_model()
+
+    X = build_input_df(data_list)
+
+    bucket_proba_batch = bucket_model.predict_proba(X)
+    bucket_classes = bucket_model.classes_
+    
+    log_pred_batch = reg_model.predict(X)
+    
+    BUCKET_LABELS = {
+        "Fast": "≤ 90 minutes",
+        "Medium": "1.5 hours – 24 hours",
+        "Slow": "> 24 hours",
+    }
+
+    results = []
+    for i, bucket_proba in enumerate(bucket_proba_batch):
+        pred_bucket = bucket_classes[np.argmax(bucket_proba)]
+        bucket_confidence = float(np.max(bucket_proba))
+        
+        log_pred = log_pred_batch[i]
+        estimated_minutes = float(np.expm1(log_pred))
+        estimated_minutes = max(1, round(estimated_minutes, 1))
+        
+        results.append({
+            "bucket": pred_bucket,
+            "bucket_label": BUCKET_LABELS.get(pred_bucket, pred_bucket),
+            "confidence": round(bucket_confidence, 3),
+            "estimated_minutes": estimated_minutes,
+            "estimated_hours": round(estimated_minutes / 60, 1),
+            "bucket_probabilities": {
+                cls: round(float(p), 3)
+                for cls, p in zip(bucket_classes, bucket_proba)
+            },
+        })
+    return results
 
 
 def get_shap_explanation(data: dict, model_type: str = "priority") -> list:
