@@ -214,10 +214,26 @@ def sync_traffic(db: Session, weather_context: dict | None = None) -> list[dict]
     condition = weather.get("condition", "Clear")
 
     # Step 1: Gather data (Network + Read-only queries) WITHOUT acquiring a write lock
-    corridor_data = []
+    # Use ThreadPoolExecutor for I/O bound network requests to make this lightning fast
+    import concurrent.futures
+
     dynamic_waypoints = get_dynamic_waypoints(db)
-    for corridor, (lat, lon) in dynamic_waypoints.items():
-        flow = _fetch_corridor_flow(corridor, lat, lon)
+    
+    def fetch_single_corridor(corridor_item):
+        c_name, coords = corridor_item
+        lat, lon = coords
+        flow = _fetch_corridor_flow(c_name, lat, lon)
+        return c_name, flow
+        
+    corridor_flows = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        results = executor.map(fetch_single_corridor, dynamic_waypoints.items())
+        for c_name, flow in results:
+            corridor_flows[c_name] = flow
+
+    corridor_data = []
+    for corridor in dynamic_waypoints.keys():
+        flow = corridor_flows.get(corridor)
         incident_count = _count_active_incidents(db, corridor)
         corridor_data.append((corridor, flow, incident_count))
 
