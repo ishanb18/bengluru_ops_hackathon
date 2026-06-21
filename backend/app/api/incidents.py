@@ -296,7 +296,7 @@ def report_incident(request: IncidentReportRequest, db: Session = Depends(get_db
         has_cargo_data=0,
         has_truck_age=0,
         has_junction=0,
-        is_authenticated=0,
+        authenticated=0,
     )
 
     try:
