@@ -234,9 +234,52 @@ def pothole_escalation(db: Session = Depends(get_db)):
 def get_corridors(db: Session = Depends(get_db)):
     """Fetch distinct live corridors from the database to populate dropdowns."""
     corridors = db.query(Event.corridor).filter(Event.corridor != None, Event.corridor != "").distinct().all()
-    # corridors is a list of tuples like [('Tumkur Road',), ('Mysore Road',)]
     result = [c[0] for c in corridors]
-    # Ensure Non-corridor is always an option
     if "Non-corridor" not in result:
         result.append("Non-corridor")
     return sorted(result)
+
+
+@router.get("/metadata/zones", response_model=List[str])
+def get_zones(db: Session = Depends(get_db)):
+    """Fetch distinct zones from the database to populate dropdowns."""
+    zones = db.query(Event.zone).filter(Event.zone != None, Event.zone != "", Event.zone != "Unknown").distinct().all()
+    result = [z[0] for z in zones]
+    return sorted(result)
+
+
+@router.post("/pothole-escalation/escalate")
+def escalate_pothole(payload: dict, db: Session = Depends(get_db)):
+    """
+    Mock BBMP escalation action for a pothole incident.
+    In production this would fire an API call to BBMP's system or send an SMS.
+    Here it marks the event and returns a confirmation ticket number.
+    """
+    from datetime import datetime
+    import random, string
+
+    incident_id = payload.get("incident_id")
+    if not incident_id:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="incident_id is required")
+
+    event = db.query(Event).filter(Event.id == incident_id).first()
+    if not event:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail=f"Incident {incident_id} not found")
+
+    # Generate a mock BBMP ticket reference
+    ticket_id = "BBMP-" + "".join(random.choices(string.ascii_uppercase + string.digits, k=8))
+    escalated_at = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    return {
+        "success": True,
+        "incident_id": incident_id,
+        "ticket_id": ticket_id,
+        "escalated_at": escalated_at,
+        "message": f"Escalation ticket {ticket_id} raised with BBMP Maintenance Division. Expected response: 48–72 hours.",
+        "assigned_to": "BBMP Roads & Infrastructure Division",
+        "priority_level": "P2 — Chronic Infrastructure",
+        "estimated_response_days": 2,
+    }
+

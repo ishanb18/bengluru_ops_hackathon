@@ -4,6 +4,9 @@ import AICommand from "./components/AICommand";
 import Diversion from "./components/Diversion";
 import Analytics from "./components/Analytics";
 import FutureRisk from "./components/FutureRisk";
+import EventCalendar from "./components/EventCalendar";
+import ShiftReport from "./components/ShiftReport";
+import PotholeTracker from "./components/PotholeTracker";
 
 const BACKEND_URL = "http://127.0.0.1:8000";
 
@@ -28,6 +31,9 @@ const NAV_ITEMS = [
   { icon: "🔀", label: "Diversion Suggestion", id: 2 },
   { icon: "📊", label: "Analytics Dashboard", id: 3 },
   { icon: "⚡", label: "Future Risk View", id: 4 },
+  { icon: "📅", label: "Event Calendar", id: 5 },
+  { icon: "📋", label: "Shift Report", id: 6 },
+  { icon: "🕳️", label: "Pothole Tracker", id: 7 },
 ];
 
 export default function App() {
@@ -362,6 +368,9 @@ export default function App() {
         {activeTab === 2 && <Diversion availableCorridors={availableCorridors} />}
         {activeTab === 3 && <Analytics stats={stats} />}
         {activeTab === 4 && <FutureRisk />}
+        {activeTab === 5 && <EventCalendar />}
+        {activeTab === 6 && <ShiftReport addToast={addToast} />}
+        {activeTab === 7 && <PotholeTracker addToast={addToast} />}
       </main>
     </div>
   );

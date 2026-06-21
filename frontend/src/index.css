@@ -543,3 +543,47 @@ tr:last-child td { border-bottom: none; }
   position: absolute; bottom: 16px; right: 16px;
   color: #fff; font-family: monospace; font-size: 14px; text-shadow: 1px 1px 2px #000; z-index: 3;
 }
+
+/* ── SHIFT REPORT ── */
+.shift-summary-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.04);
+  backdrop-filter: blur(24px);
+  transition: background-color 0.3s ease;
+}
+
+.shift-event-row:hover {
+  background: var(--bg) !important;
+}
+
+.shift-event-row:last-child {
+  border-bottom: none !important;
+}
+
+/* ── SPINNER ── */
+.shift-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── SLIDE UP MODAL ANIMATION ── */
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(30px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+

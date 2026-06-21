@@ -12,7 +12,7 @@ import os, sys, logging
 # Add backend root to path for ml.predict imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from app.api import incidents, classify, duration, manpower, diversion, analytics, scan
+from app.api import incidents, classify, duration, manpower, diversion, analytics, scan, planned_events
 from app.api import traffic as traffic_router
 from app.models.db import create_tables, SessionLocal
 from app.core.config import settings
@@ -50,6 +50,7 @@ app.include_router(diversion.router, prefix="/api")
 app.include_router(analytics.router, prefix="/api")
 app.include_router(traffic_router.router, prefix="/api")  # 2.0: live traffic + weather
 app.include_router(scan.router, prefix="/api")
+app.include_router(planned_events.router, prefix="/api")
 
 # Track background tasks so we can cancel them cleanly on shutdown
 _background_tasks: list = []
@@ -239,6 +240,7 @@ def root():
             "GET  /api/incidents",
             "GET  /api/incidents/{id}",
             "GET  /api/incidents/summary",
+            "GET  /api/incidents/timeline",
             "POST /api/classify",
             "POST /api/duration",
             "POST /api/manpower",
@@ -248,8 +250,10 @@ def root():
             "GET  /api/analytics/top-junctions",
             "GET  /api/analytics/peak-hours",
             "GET  /api/analytics/pothole-escalation",
+            "POST /api/analytics/pothole-escalation/escalate",
             "GET  /api/analytics/cause-breakdown",
             "GET  /api/analytics/summary",
+            "GET  /api/analytics/metadata/zones",
         ],
     }
 
