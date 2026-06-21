@@ -240,6 +240,7 @@ def root():
             "GET  /api/incidents",
             "GET  /api/incidents/{id}",
             "GET  /api/incidents/summary",
+            "GET  /api/incidents/timeline",
             "POST /api/classify",
             "POST /api/duration",
             "POST /api/manpower",
@@ -249,8 +250,10 @@ def root():
             "GET  /api/analytics/top-junctions",
             "GET  /api/analytics/peak-hours",
             "GET  /api/analytics/pothole-escalation",
+            "POST /api/analytics/pothole-escalation/escalate",
             "GET  /api/analytics/cause-breakdown",
             "GET  /api/analytics/summary",
+            "GET  /api/analytics/metadata/zones",
         ],
     }
 

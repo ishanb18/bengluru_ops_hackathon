@@ -79,6 +79,102 @@ def list_incidents(
     )
 
 
+@router.get("/timeline")
+def get_incident_timeline(
+    hours: int = Query(8, ge=1, le=24, description="Hours back to query: 8 or 24"),
+    zone: Optional[str] = Query(None, description="Filter by zone"),
+    corridor: Optional[str] = Query(None, description="Filter by corridor"),
+    db: Session = Depends(get_db),
+):
+    """
+    Return a chronological activity log of incidents from the last N hours.
+    Used by the Shift Report / Incident Timeline screen.
+    When the DB has no start_datetime data for 'active' events (historical seed),
+    we fall back to sampling recent historical events to give a realistic demo.
+    """
+    from datetime import datetime, timedelta
+    from sqlalchemy import func as sql_func
+
+    cutoff = datetime.now() - timedelta(hours=hours)
+
+    filters = [Event.start_datetime >= cutoff]
+    if zone:
+        filters.append(Event.zone == zone)
+    if corridor:
+        filters.append(Event.corridor == corridor)
+
+    events = (
+        db.query(Event)
+        .filter(and_(*filters))
+        .order_by(Event.start_datetime.desc())
+        .limit(200)
+        .all()
+    )
+
+    # Fallback: if no events in the time window (historical data has old dates),
+    # return a representative sample of recent historical events for demo purposes.
+    if not events:
+        q = db.query(Event).filter(Event.start_datetime.isnot(None))
+        if zone:
+            q = q.filter(Event.zone == zone)
+        if corridor:
+            q = q.filter(Event.corridor == corridor)
+        events = q.order_by(Event.start_datetime.desc()).limit(50).all()
+
+    items = []
+    for e in events:
+        # Compute elapsed label
+        elapsed_label = "Unknown"
+        if e.start_datetime:
+            try:
+                delta = datetime.now() - e.start_datetime
+                total_min = int(delta.total_seconds() / 60)
+                if total_min < 60:
+                    elapsed_label = f"{total_min}m ago"
+                elif total_min < 1440:
+                    elapsed_label = f"{total_min // 60}h {total_min % 60}m ago"
+                else:
+                    elapsed_label = f"{total_min // 1440}d ago"
+            except Exception:
+                elapsed_label = "—"
+
+        items.append({
+            "id": e.id,
+            "event_cause": (e.event_cause or "unknown").replace("_", " ").title(),
+            "corridor": e.corridor or "Non-corridor",
+            "zone": e.zone or "Unknown",
+            "priority": e.priority or "Low",
+            "status": e.status or "unknown",
+            "requires_road_closure": bool(e.requires_road_closure),
+            "duration_bucket": e.duration_bucket,
+            "duration_minutes": e.duration_minutes,
+            "address": e.address or "",
+            "is_peak_hour": bool(e.is_peak_hour),
+            "authenticated": bool(e.authenticated),
+            "start_datetime": str(e.start_datetime) if e.start_datetime else None,
+            "elapsed_label": elapsed_label,
+            "hour": e.hour,
+            "police_station": e.police_station or "",
+        })
+
+    # Summary counts for the shift report header
+    total = len(items)
+    high_count = sum(1 for i in items if i["priority"] == "High")
+    closure_count = sum(1 for i in items if i["requires_road_closure"])
+    resolved_count = sum(1 for i in items if i["status"] == "closed")
+
+    return {
+        "hours": hours,
+        "zone_filter": zone,
+        "corridor_filter": corridor,
+        "total_events": total,
+        "high_priority_count": high_count,
+        "closure_count": closure_count,
+        "resolved_count": resolved_count,
+        "events": items,
+    }
+
+
 @router.get("/summary")
 def get_summary(db: Session = Depends(get_db)):
     """Return high-level KPI stats for the dashboard top bar."""
