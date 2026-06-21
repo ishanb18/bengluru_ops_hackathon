@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 
-const API = "http://127.0.0.1:8000";
+const API = import.meta.env.VITE_API_URL || "";
 
 function DaysBar({ days }) {
   // Visual severity bar: green < 7d, amber 7-14d, red > 14d

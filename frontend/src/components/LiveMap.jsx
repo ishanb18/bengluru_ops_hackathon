@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import L from "leaflet";
 
-const API = "http://127.0.0.1:8000";
+const API = import.meta.env.VITE_API_URL || "";
 
 const STATUS_COLOR = {
   Low: "var(--green)",

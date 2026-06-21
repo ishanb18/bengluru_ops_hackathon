@@ -229,35 +229,43 @@ def _seed_database():
 
 
 # ── Health Check ───────────────────────────────────────────────────────────────
-@app.get("/")
-def root():
-    return {
-        "app": settings.APP_NAME,
-        "version": settings.APP_VERSION,
-        "status": "running",
-        "docs": "/docs",
-        "endpoints": [
-            "GET  /api/incidents",
-            "GET  /api/incidents/{id}",
-            "GET  /api/incidents/summary",
-            "GET  /api/incidents/timeline",
-            "POST /api/classify",
-            "POST /api/duration",
-            "POST /api/manpower",
-            "GET  /api/diversion/{corridor}",
-            "GET  /api/analytics/corridor-risk",
-            "GET  /api/analytics/monthly-trend",
-            "GET  /api/analytics/top-junctions",
-            "GET  /api/analytics/peak-hours",
-            "GET  /api/analytics/pothole-escalation",
-            "POST /api/analytics/pothole-escalation/escalate",
-            "GET  /api/analytics/cause-breakdown",
-            "GET  /api/analytics/summary",
-            "GET  /api/analytics/metadata/zones",
-        ],
-    }
-
-
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+
+# ── Serve React Frontend (Production) ─────────────────────────────────────────
+# This MUST be mounted AFTER all API routers so /api/* routes take priority.
+from pathlib import Path
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
+FRONTEND_DIR = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+
+if FRONTEND_DIR.exists():
+    # Serve static assets (JS, CSS, images)
+    app.mount("/assets", StaticFiles(directory=FRONTEND_DIR / "assets"), name="static-assets")
+
+    # Serve any other static files at root level (favicon, etc.)
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        """Catch-all: serve static files or fall back to index.html for SPA routing."""
+        file_path = FRONTEND_DIR / full_path
+        if file_path.exists() and file_path.is_file():
+            return FileResponse(file_path)
+        # SPA fallback — let React Router handle the route
+        return FileResponse(FRONTEND_DIR / "index.html")
+
+    logger.info(f"[OK] Serving React frontend from {FRONTEND_DIR}")
+else:
+    # Dev mode — no build exists, just show the API info
+    @app.get("/")
+    def root():
+        return {
+            "app": settings.APP_NAME,
+            "version": settings.APP_VERSION,
+            "status": "running",
+            "note": "Frontend not built. Run: cd frontend && npm run build",
+            "docs": "/docs",
+        }
+    logger.info("[INFO] No frontend build found — API-only mode. Run 'cd frontend && npm run build' to enable.")

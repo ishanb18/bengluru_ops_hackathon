@@ -593,3 +593,52 @@ select option {
   background-color: var(--input-bg);
   color: var(--text-primary);
 }
+
+/* ── EVENT CALENDAR ── */
+.cal-day-cell:hover {
+  background: var(--primary-dim) !important;
+}
+
+.cal-nav-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text-primary);
+  font-size: 20px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  line-height: 1;
+}
+.cal-nav-btn:hover {
+  background: var(--primary-dim);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.cal-today-btn {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.cal-today-btn:hover {
+  background: var(--primary-dim);
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+.cal-upcoming-row:hover {
+  border-color: var(--primary) !important;
+  background: var(--primary-dim) !important;
+}

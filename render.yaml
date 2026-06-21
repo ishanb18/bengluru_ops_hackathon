@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: bengaluruops
+    runtime: python
+    buildCommand: |
+      cd frontend && npm install && npm run build && cd ../backend && pip install -r requirements.txt
+    startCommand: cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.0"
+      - key: NODE_VERSION
+        value: "18"
+      - key: TOMTOM_API_KEY
+        sync: false
+      - key: TOMTOM_API_KEY_FALLBACK
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: OPENWEATHER_API_KEY
+        sync: false

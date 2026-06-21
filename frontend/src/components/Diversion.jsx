@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 
-const API = "http://127.0.0.1:8000";
+const API = import.meta.env.VITE_API_URL || "";
 
 // Top corridors to dynamically pre-fetch summary diversions for the summary panel
 const TOP_CORRIDORS_FOR_PANEL = [
