@@ -111,7 +111,7 @@ async def startup_event():
             await asyncio.sleep(900)  # 15 minutes
 
     async def traffic_poller():
-        """Polls TomTom Flow API for corridor speeds every 5 minutes. Runs immediately on startup."""
+        """Polls TomTom Flow API for corridor speeds every 2 hours. Runs immediately on startup."""
         await asyncio.sleep(1)  # brief wait so weather runs first and populates _weather_ctx
         while True:
             db = SessionLocal()
@@ -122,7 +122,7 @@ async def startup_event():
                 logger.error(f"Traffic polling error: {e}")
             finally:
                 db.close()
-            await asyncio.sleep(300)  # 5 minutes
+            await asyncio.sleep(7200)  # 2 hours
 
     _background_tasks.append(asyncio.create_task(weather_poller()))
     _background_tasks.append(asyncio.create_task(traffic_poller()))
