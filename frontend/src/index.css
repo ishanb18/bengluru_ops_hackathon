@@ -26,6 +26,7 @@
 
 /* ── DARK MODE ── */
 [data-theme="dark"] {
+  color-scheme: dark;
   --bg: #0d0d0f;
   --sidebar-bg: rgba(22, 22, 26, 0.92);
   --card-bg: rgba(28, 28, 32, 0.85);
