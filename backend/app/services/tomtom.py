@@ -253,11 +253,9 @@ def sync_tomtom_incidents(db: Session):
             start_datetime=incident_time,
         )
 
-    # Use ThreadPoolExecutor to speed up LLM inference
-    new_events = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-        results = list(executor.map(process_incident, incidents))
-        new_events = [r for r in results if r is not None]
+    # Process incidents sequentially (ML models already use native C++ multithreading, so Python threads cause massive contention)
+    results = [process_incident(inc) for inc in incidents]
+    new_events = [r for r in results if r is not None]
 
     # Now do a smart UPSERT to preserve historical data
     try:

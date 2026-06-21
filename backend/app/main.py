@@ -8,6 +8,10 @@ and starts three background collectors (TomTom incidents, TomTom flow, OpenWeath
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import os, sys, logging
+import warnings
+
+# Suppress sklearn parallel/joblib warnings on Render
+warnings.filterwarnings("ignore", category=UserWarning, module="sklearn")
 
 # Add backend root to path for ml.predict imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
