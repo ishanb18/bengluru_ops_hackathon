@@ -39,6 +39,9 @@ export default function LiveMap({ events, onRunAI, onScanComplete, addToast }) {
   const [trafficLoading, setTrafficLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState(null);
   const [scanning, setScanning] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportForm, setReportForm] = useState({ event_cause: 'vehicle_breakdown', corridor: 'Non-corridor', veh_type: 'N/A', address: '', reporter_name: 'Field Officer' });
+  const [reportSubmitting, setReportSubmitting] = useState(false);
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState("");
@@ -240,6 +243,17 @@ export default function LiveMap({ events, onRunAI, onScanComplete, addToast }) {
           </div>
         </div>
         <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+          <button
+            onClick={() => setShowReportModal(true)}
+            style={{
+              background: "linear-gradient(135deg, #dc2626, #b91c1c)",
+              color: "white", border: "none", borderRadius: "8px",
+              padding: "9px 16px", fontWeight: "700", fontSize: "12px",
+              cursor: "pointer", display: "flex", alignItems: "center", gap: "6px"
+            }}
+          >
+            📝 Report Incident
+          </button>
           <button
             className={`btn btn-scan ${scanning ? "scanning" : ""}`}
             onClick={handleScan}
@@ -448,6 +462,127 @@ export default function LiveMap({ events, onRunAI, onScanComplete, addToast }) {
                 ⚠️ SIMULATED DEMO FEED
               </div>
               <div className="cctv-timestamp">LIVE - {new Date().toLocaleTimeString("en-IN")}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Report Incident Modal */}
+      {showReportModal && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)",
+          zIndex: 9000, display: "flex", alignItems: "center", justifyContent: "center",
+          backdropFilter: "blur(6px)"
+        }} onClick={(e) => e.target === e.currentTarget && setShowReportModal(false)}>
+          <div style={{
+            background: "var(--card-bg)", border: "1px solid var(--border)",
+            borderRadius: "16px", padding: "28px", width: "480px", maxHeight: "90vh",
+            overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.5)"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+              <h3 style={{ fontSize: "16px", fontWeight: "800", color: "var(--text-primary)", margin: 0 }}>📝 Report New Incident</h3>
+              <button onClick={() => setShowReportModal(false)} style={{ background: "none", border: "none", fontSize: "18px", cursor: "pointer", color: "var(--text-tertiary)" }}>✕</button>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+              {/* Event Cause */}
+              <div>
+                <label style={{ fontSize: "11px", fontWeight: "700", color: "var(--text-tertiary)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Event Cause</label>
+                <select
+                  value={reportForm.event_cause}
+                  onChange={e => setReportForm(p => ({...p, event_cause: e.target.value}))}
+                  style={{ width: "100%", padding: "10px 12px", background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "8px", color: "var(--text-primary)", fontSize: "13px" }}
+                >
+                  {["vehicle_breakdown","accident","construction","water_logging","vip_movement","public_event","pot_holes","tree_fall","Stationary Traffic","Jam","Queueing Traffic","abandoned_vehicle","oil_spill","pedestrian_incident","others"].map(c => (
+                    <option key={c} value={c}>{c.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Corridor */}
+              <div>
+                <label style={{ fontSize: "11px", fontWeight: "700", color: "var(--text-tertiary)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Corridor</label>
+                <select
+                  value={reportForm.corridor}
+                  onChange={e => setReportForm(p => ({...p, corridor: e.target.value}))}
+                  style={{ width: "100%", padding: "10px 12px", background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "8px", color: "var(--text-primary)", fontSize: "13px" }}
+                >
+                  {["Tumkur Road","Mysore Road","Bellary Road 1","Bellary Road 2","Hosur Road","ORR East 1","ORR East 2","ORR North 1","Old Madras Road","Bannerghata Road","Magadi Road","West of Chord Road","CBD 1","Non-corridor"].map(c => (
+                    <option key={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Vehicle Type */}
+              <div>
+                <label style={{ fontSize: "11px", fontWeight: "700", color: "var(--text-tertiary)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Vehicle Type</label>
+                <select
+                  value={reportForm.veh_type}
+                  onChange={e => setReportForm(p => ({...p, veh_type: e.target.value}))}
+                  style={{ width: "100%", padding: "10px 12px", background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "8px", color: "var(--text-primary)", fontSize: "13px" }}
+                >
+                  {["N/A","heavy_vehicle","lcv","private_car","bus","two_wheeler"].map(v => (
+                    <option key={v} value={v}>{v.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Address */}
+              <div>
+                <label style={{ fontSize: "11px", fontWeight: "700", color: "var(--text-tertiary)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Address / Landmark</label>
+                <input
+                  value={reportForm.address}
+                  onChange={e => setReportForm(p => ({...p, address: e.target.value}))}
+                  placeholder="e.g. Near Silk Board Junction"
+                  style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "8px", color: "var(--text-primary)", fontSize: "13px" }}
+                />
+              </div>
+
+              {/* Reporter Name */}
+              <div>
+                <label style={{ fontSize: "11px", fontWeight: "700", color: "var(--text-tertiary)", textTransform: "uppercase", display: "block", marginBottom: "6px" }}>Reporter Name</label>
+                <input
+                  value={reportForm.reporter_name}
+                  onChange={e => setReportForm(p => ({...p, reporter_name: e.target.value}))}
+                  placeholder="Officer name or badge ID"
+                  style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: "8px", color: "var(--text-primary)", fontSize: "13px" }}
+                />
+              </div>
+
+              {/* Submit */}
+              <button
+                disabled={reportSubmitting}
+                onClick={async () => {
+                  setReportSubmitting(true);
+                  try {
+                    const res = await fetch(`${API}/api/incidents/report`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify(reportForm),
+                    });
+                    if (res.ok) {
+                      setShowReportModal(false);
+                      setReportForm({ event_cause: 'vehicle_breakdown', corridor: 'Non-corridor', veh_type: 'N/A', address: '', reporter_name: 'Field Officer' });
+                      addToast?.("✅", "Incident reported successfully!");
+                      if (onScanComplete) await onScanComplete();
+                    } else {
+                      addToast?.("❌", "Failed to submit incident report.");
+                    }
+                  } catch (err) {
+                    addToast?.("❌", "Network error submitting report.");
+                  } finally {
+                    setReportSubmitting(false);
+                  }
+                }}
+                style={{
+                  background: reportSubmitting ? "var(--border)" : "linear-gradient(135deg, #dc2626, #b91c1c)",
+                  color: "white", border: "none", borderRadius: "10px",
+                  padding: "12px", fontWeight: "700", fontSize: "14px",
+                  cursor: reportSubmitting ? "not-allowed" : "pointer", marginTop: "4px"
+                }}
+              >
+                {reportSubmitting ? "Submitting..." : "📝 Submit Incident Report"}
+              </button>
             </div>
           </div>
         </div>

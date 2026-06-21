@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 from typing import Optional
+from pydantic import BaseModel
 import math
 
 from ..models.db import get_db, Event
@@ -140,3 +141,79 @@ def get_incident(incident_id: int, db: Session = Depends(get_db)):
         start_datetime=str(event.start_datetime) if event.start_datetime else None,
         closed_datetime=str(event.closed_datetime) if event.closed_datetime else None,
     )
+
+
+class IncidentReportRequest(BaseModel):
+    event_cause: str
+    corridor: str
+    veh_type: str = "N/A"
+    description: str = ""
+    address: str = ""
+    latitude: float = 12.9716
+    longitude: float = 77.5946
+    reporter_name: str = "Field Officer"
+
+
+@router.post("/report")
+def report_incident(request: IncidentReportRequest, db: Session = Depends(get_db)):
+    """
+    Submit a new incident report from field officers or citizens.
+    Auto-classifies priority based on event_cause and creates DB entry.
+    """
+    from datetime import datetime
+    import random
+
+    # Auto-priority rules
+    high_priority_causes = ["accident", "vehicle_breakdown", "water_logging", "tree_fall", "oil_spill"]
+    priority_high = 1 if request.event_cause in high_priority_causes else 0
+    priority = "High" if priority_high else "Low"
+    requires_closure = 1 if request.event_cause in ["accident", "tree_fall", "construction"] else 0
+
+    now = datetime.now()
+    hour = now.hour
+    weekday = now.weekday()
+    month = now.month
+    is_peak = 1 if (8 <= hour <= 10 or 17 <= hour <= 20) else 0
+
+    new_event = Event(
+        status="active",
+        authenticated=False,
+        latitude=request.latitude,
+        longitude=request.longitude,
+        address=request.address or f"Reported near {request.corridor}",
+        event_type="unplanned",
+        event_cause=request.event_cause,
+        corridor=request.corridor,
+        zone="Unknown",
+        veh_type=request.veh_type,
+        junction="unmapped",
+        police_station="",
+        start_datetime=now,
+        hour=hour,
+        weekday=weekday,
+        month=month,
+        is_peak_hour=is_peak,
+        priority=priority,
+        priority_high=priority_high,
+        requires_road_closure=requires_closure,
+        duration_bucket="Medium",
+        has_cargo_data=0,
+        has_truck_age=0,
+        has_junction=0,
+        is_authenticated=0,
+    )
+
+    try:
+        db.add(new_event)
+        db.commit()
+        db.refresh(new_event)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to save incident: {e}")
+
+    return {
+        "success": True,
+        "incident_id": new_event.id,
+        "priority": priority,
+        "message": f"Incident reported successfully. Priority: {priority}. ID: {new_event.id}",
+    }

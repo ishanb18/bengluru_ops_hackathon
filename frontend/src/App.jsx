@@ -4,6 +4,7 @@ import AICommand from "./components/AICommand";
 import Diversion from "./components/Diversion";
 import Analytics from "./components/Analytics";
 import FutureRisk from "./components/FutureRisk";
+import EventCalendar from "./components/EventCalendar";
 
 const BACKEND_URL = "http://127.0.0.1:8000";
 
@@ -28,6 +29,7 @@ const NAV_ITEMS = [
   { icon: "🔀", label: "Diversion Suggestion", id: 2 },
   { icon: "📊", label: "Analytics Dashboard", id: 3 },
   { icon: "⚡", label: "Future Risk View", id: 4 },
+  { icon: "📅", label: "Event Calendar", id: 5 },
 ];
 
 export default function App() {
@@ -362,6 +364,7 @@ export default function App() {
         {activeTab === 2 && <Diversion availableCorridors={availableCorridors} />}
         {activeTab === 3 && <Analytics stats={stats} />}
         {activeTab === 4 && <FutureRisk />}
+        {activeTab === 5 && <EventCalendar />}
       </main>
     </div>
   );
