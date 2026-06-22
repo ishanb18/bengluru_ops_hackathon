@@ -52,6 +52,7 @@ TOMTOM_API_KEY=your_primary_tomtom_key
 TOMTOM_API_KEY_FALLBACK=your_backup_tomtom_key
 GROQ_API_KEY=your_groq_llm_key
 OPENWEATHER_API_KEY=your_openweather_key
+TAVILY_API_KEY=your_tavily_web_search_key
 ```
 
 ### 3. Frontend Setup (React/Vite)

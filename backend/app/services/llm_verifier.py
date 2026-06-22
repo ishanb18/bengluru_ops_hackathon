@@ -34,7 +34,11 @@ def verify_incident_via_llm(event_cause: str, address: str) -> dict:
     query = f"Bengaluru {clean_address} traffic news {event_cause}"
     search_results = []
     try:
-        tavily_key = "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"
+        tavily_key = settings.TAVILY_API_KEY
+        if not tavily_key:
+            logger.warning("TAVILY_API_KEY is missing — web search skipped.")
+            search_results = ["Tavily API key not configured."]
+            raise ValueError("skip_tavily")
         response = httpx.post(
             "https://api.tavily.com/search",
             json={

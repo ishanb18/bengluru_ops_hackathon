@@ -18,6 +18,7 @@ class Settings:
     TOMTOM_API_KEY_FALLBACK: str = os.getenv("TOMTOM_API_KEY_FALLBACK", "")
     GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
     OPENWEATHER_API_KEY: str = os.getenv("OPENWEATHER_API_KEY", "")
+    TAVILY_API_KEY: str = os.getenv("TAVILY_API_KEY", "")
 
     # CORS — allow local dev + any origin in hackathon demo
     CORS_ORIGINS: list = [
