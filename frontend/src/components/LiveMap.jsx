@@ -116,7 +116,8 @@ export default function LiveMap({ events, onRunAI, onScanComplete, addToast, onR
   const handleResolve = async (id, event) => {
     if (event) event.stopPropagation();
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/incidents/${id}/resolve`, {
+      const baseUrl = import.meta.env.VITE_API_URL || "";
+      const res = await fetch(`${baseUrl}/api/incidents/${id}/resolve`, {
         method: "PATCH"
       });
       const data = await res.json();
