@@ -312,3 +312,56 @@ def report_incident(request: IncidentReportRequest, db: Session = Depends(get_db
         "priority": priority,
         "message": f"Incident reported successfully. Priority: {priority}. ID: {new_event.id}",
     }
+
+
+@router.patch("/{incident_id}/resolve")
+def resolve_incident(incident_id: int, db: Session = Depends(get_db)):
+    """
+    Mark an active incident as resolved.
+    Sets status to 'resolved', records closed_datetime, and calculates actual duration.
+    """
+    from datetime import datetime
+
+    event = db.query(Event).filter(Event.id == incident_id).first()
+    if not event:
+        raise HTTPException(status_code=404, detail=f"Incident {incident_id} not found")
+
+    if event.status == "resolved" or event.status == "closed":
+        return {
+            "success": True,
+            "incident_id": incident_id,
+            "message": f"Incident {incident_id} is already {event.status}.",
+        }
+
+    now = datetime.now()
+    event.status = "resolved"
+    event.closed_datetime = now
+
+    # Calculate actual duration if start_datetime exists
+    if event.start_datetime:
+        try:
+            delta = now - event.start_datetime
+            event.duration_minutes = round(delta.total_seconds() / 60, 1)
+            if event.duration_minutes <= 90:
+                event.duration_bucket = "Fast"
+            elif event.duration_minutes <= 1440:
+                event.duration_bucket = "Medium"
+            else:
+                event.duration_bucket = "Slow"
+        except Exception:
+            pass
+
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to resolve incident: {e}")
+
+    return {
+        "success": True,
+        "incident_id": incident_id,
+        "status": "resolved",
+        "closed_datetime": str(now),
+        "duration_minutes": event.duration_minutes,
+        "message": f"Incident {incident_id} marked as resolved.",
+    }

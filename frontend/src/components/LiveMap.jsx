@@ -68,18 +68,23 @@ export default function LiveMap({ events, onRunAI, onScanComplete, addToast }) {
     return result;
   }, [events, searchQuery, priorityFilter]);
 
+  const tileLayerRef = useRef(null);
+
+  // Helper: get correct tile URL for current theme
+  const getTileUrl = () => {
+    const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+    return isDark
+      ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+      : "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
+  };
+
   // Initialize Map
   useEffect(() => {
     if (mapRef.current) return; // already initialized
 
     const map = L.map(mapContainerRef.current).setView([12.9716, 77.5946], 12);
-    
-    const isDark = document.documentElement.getAttribute("data-theme") === "dark";
-    const tileUrl = isDark
-      ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-      : "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
-    
-    L.tileLayer(tileUrl, {
+
+    tileLayerRef.current = L.tileLayer(getTileUrl(), {
       attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
       maxZoom: 20
     }).addTo(map);
@@ -87,7 +92,19 @@ export default function LiveMap({ events, onRunAI, onScanComplete, addToast }) {
     mapRef.current = map;
     markersRef.current = L.layerGroup().addTo(map);
 
+    // Watch for theme changes and swap tiles in real-time
+    const observer = new MutationObserver(() => {
+      if (mapRef.current && tileLayerRef.current) {
+        tileLayerRef.current.setUrl(getTileUrl());
+      }
+    });
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme"],
+    });
+
     return () => {
+      observer.disconnect();
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
@@ -96,6 +113,32 @@ export default function LiveMap({ events, onRunAI, onScanComplete, addToast }) {
   }, []);
 
   // Update Markers when filtered events change
+  const handleResolve = async (id, event) => {
+    if (event) event.stopPropagation();
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/incidents/${id}/resolve`, {
+        method: "PATCH"
+      });
+      const data = await res.json();
+      if (data.success) {
+        addToast(`✅ Incident resolved! (Duration: ${data.duration_minutes || '?'} mins)`);
+        // We trigger onScanComplete or something to refresh the list. 
+        // We can just call onScanComplete with an empty array or trigger a re-fetch.
+        // Easiest is to ask App.jsx to re-fetch via onScanComplete if that does it, but actually the button in LiveMap 
+        // won't automatically re-fetch the incidents list unless App passes a refresh function.
+        // Let's just remove it from local state for immediate UI feedback.
+        // Wait, events is passed as prop. We can't modify it here.
+        // Let's call a prop if available, or just rely on the 10s auto-refresh in App.jsx.
+        // The App.jsx already polls every 10 seconds! So we just show a toast and wait.
+      } else {
+        addToast(`❌ Failed to resolve: ${data.message}`);
+      }
+    } catch (e) {
+      console.error(e);
+      addToast(`❌ Error resolving incident`);
+    }
+  };
+
   useEffect(() => {
     if (!mapRef.current || !markersRef.current) return;
 
@@ -163,8 +206,23 @@ export default function LiveMap({ events, onRunAI, onScanComplete, addToast }) {
         setCctvData({ corridor: e.corridor || "Bengaluru Traffic", videoUrl: randomVid });
       };
 
+      const resolveBtn = document.createElement("button");
+      resolveBtn.className = "btn";
+      resolveBtn.style.width = "100%";
+      resolveBtn.style.fontSize = "10px";
+      resolveBtn.style.padding = "6px";
+      resolveBtn.style.justifyContent = "center";
+      resolveBtn.style.height = "auto";
+      resolveBtn.style.marginTop = "6px";
+      resolveBtn.style.background = "var(--green-dim)";
+      resolveBtn.style.color = "var(--green)";
+      resolveBtn.style.border = "1px solid rgba(22,163,74,0.15)";
+      resolveBtn.textContent = "✅ Mark Resolved";
+      resolveBtn.onclick = (evt) => handleResolve(e.id, evt);
+
       container.appendChild(actionBtn);
       container.appendChild(cctvBtn);
+      container.appendChild(resolveBtn);
 
       marker.bindPopup(container);
       markersRef.current.addLayer(marker);
@@ -366,16 +424,25 @@ export default function LiveMap({ events, onRunAI, onScanComplete, addToast }) {
                       {e.requires_road_closure === 1 && (
                         <span className="badge badge-amber" style={{ fontSize: "9px", padding: "2px 6px" }}>Road Closure</span>
                       )}
-                      <button
-                        className="btn btn-primary"
-                        style={{ padding: "4px 8px", fontSize: "9px", marginLeft: "auto", height: "auto" }}
-                        onClick={(evt) => {
-                          evt.stopPropagation();
-                          onRunAI(e.id);
-                        }}
-                      >
-                        🔮 AI Recommendation
-                      </button>
+                      <div style={{ marginLeft: "auto", display: "flex", gap: "6px" }}>
+                        <button
+                          className="btn btn-primary"
+                          style={{ padding: "4px 8px", fontSize: "9px", height: "auto" }}
+                          onClick={(evt) => {
+                            evt.stopPropagation();
+                            onRunAI(e.id);
+                          }}
+                        >
+                          🔮 AI Recommendation
+                        </button>
+                        <button
+                          className="btn"
+                          style={{ padding: "4px 8px", fontSize: "9px", height: "auto", background: "var(--green-dim)", color: "var(--green)", border: "1px solid rgba(22,163,74,0.15)" }}
+                          onClick={(evt) => handleResolve(e.id, evt)}
+                        >
+                          ✅ Resolve
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
