@@ -186,7 +186,7 @@ def get_summary(db: Session = Depends(get_db)):
     road_closures_active = db.query(Event).filter(
         Event.status == "active", Event.requires_road_closure == 1
     ).count()
-    closed_count = db.query(Event).filter(Event.status == "closed").count()
+    closed_count = db.query(Event).filter(Event.status.in_(["closed", "resolved"])).count()
 
     # Avg resolution for closed events that have duration
     from sqlalchemy import func

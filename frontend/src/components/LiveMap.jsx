@@ -27,7 +27,7 @@ const CCTV_VIDEOS = [
   "/istockphoto-1162603138-640_adpp_is.mp4",
 ];
 
-export default function LiveMap({ events, onRunAI, onScanComplete, addToast }) {
+export default function LiveMap({ events, onRunAI, onScanComplete, addToast, onRefresh }) {
   // Map refs
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
@@ -122,14 +122,7 @@ export default function LiveMap({ events, onRunAI, onScanComplete, addToast }) {
       const data = await res.json();
       if (data.success) {
         addToast(`✅ Incident resolved! (Duration: ${data.duration_minutes || '?'} mins)`);
-        // We trigger onScanComplete or something to refresh the list. 
-        // We can just call onScanComplete with an empty array or trigger a re-fetch.
-        // Easiest is to ask App.jsx to re-fetch via onScanComplete if that does it, but actually the button in LiveMap 
-        // won't automatically re-fetch the incidents list unless App passes a refresh function.
-        // Let's just remove it from local state for immediate UI feedback.
-        // Wait, events is passed as prop. We can't modify it here.
-        // Let's call a prop if available, or just rely on the 10s auto-refresh in App.jsx.
-        // The App.jsx already polls every 10 seconds! So we just show a toast and wait.
+        if (onRefresh) onRefresh();
       } else {
         addToast(`❌ Failed to resolve: ${data.message}`);
       }

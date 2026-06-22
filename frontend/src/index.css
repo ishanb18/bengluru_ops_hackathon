@@ -177,6 +177,7 @@ body {
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
 .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.grid5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; }
 
 /* ── BADGES ── */
 .badge { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 99px; }
@@ -343,6 +344,7 @@ body {
 .kpi-card.kpi-active::before { background: linear-gradient(90deg, var(--amber), #fbbf24); }
 .kpi-card.kpi-high::before { background: linear-gradient(90deg, var(--red), #f87171); }
 .kpi-card.kpi-closure::before { background: linear-gradient(90deg, var(--blue), #60a5fa); }
+.kpi-card.kpi-resolved::before { background: linear-gradient(90deg, var(--green), #4ADE80); }
 
 /* ── FILTER PILLS ── */
 .filter-pills {

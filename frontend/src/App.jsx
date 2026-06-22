@@ -332,27 +332,31 @@ export default function App() {
         </header>
 
         {/* KPI Counters Bar */}
-        <div className="grid4" style={{ marginBottom: "24px" }}>
+        <div className="grid5" style={{ marginBottom: "24px" }}>
           <div className="card kpi-card kpi-total">
-            <div className="metric-val" key={stats.total_incidents}>{stats.total_incidents.toLocaleString()}</div>
+            <div className="metric-val" key={stats.total_incidents}>{stats.total_incidents?.toLocaleString() || 0}</div>
             <div className="metric-lbl">Total database incidents</div>
           </div>
           <div className="card kpi-card kpi-active">
-            <div className="metric-val" style={{ color: "var(--amber)" }} key={stats.active_incidents}>{stats.active_incidents}</div>
+            <div className="metric-val" style={{ color: "var(--amber)" }} key={stats.active_incidents}>{stats.active_incidents || 0}</div>
             <div className="metric-lbl">Active congestion alerts</div>
           </div>
           <div className="card kpi-card kpi-high">
-            <div className="metric-val" style={{ color: "var(--red)" }} key={stats.high_priority_active}>{stats.high_priority_active}</div>
+            <div className="metric-val" style={{ color: "var(--red)" }} key={stats.high_priority_active}>{stats.high_priority_active || 0}</div>
             <div className="metric-lbl">High priority dispatch</div>
           </div>
           <div className="card kpi-card kpi-closure">
-            <div className="metric-val" style={{ color: "var(--blue)" }} key={stats.road_closures_active}>{stats.road_closures_active}</div>
+            <div className="metric-val" style={{ color: "var(--blue)" }} key={stats.road_closures_active}>{stats.road_closures_active || 0}</div>
             <div className="metric-lbl">Active road closures</div>
+          </div>
+          <div className="card kpi-card kpi-resolved">
+            <div className="metric-val" style={{ color: "var(--green)" }} key={stats.closed_incidents}>{stats.closed_incidents?.toLocaleString() || 0}</div>
+            <div className="metric-lbl">Resolved / Closed</div>
           </div>
         </div>
 
         {/* Screen Switcher */}
-        {activeTab === 0 && <LiveMap events={events} onRunAI={runAIForIncident} onScanComplete={fetchData} addToast={addToast} />}
+        {activeTab === 0 && <LiveMap events={events} onRunAI={runAIForIncident} onScanComplete={fetchData} addToast={addToast} onRefresh={fetchData} />}
         {activeTab === 1 && (
           <AICommand
             inputs={classifierInputs}
